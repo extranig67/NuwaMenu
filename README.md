@@ -1,6 +1,7 @@
 # NjordMenu🌊 - Among Us
 
 **NjordMenu** - multi-functional [BepInEx](https://github.com/BepInEx/BepInEx) mod for Among Us, developed by **Meowchelo**. Built with the intention of providing ultimate control over your game, it features deep quality-of-life improvements, extensive host privileges, hilarious trolling utilities.
+<img width="1422" height="670" alt="изображение" src="https://github.com/user-attachments/assets/db56f869-e721-4096-bf99-bb230670a65c" />
 
 ## 📋 Features
 
@@ -46,7 +47,8 @@ As NjordMenu is a [BepInEx](https://github.com/BepInEx/BepInEx) mod, you will ne
 * To change the menu toggle key, click "Bind Key" in the Menu tab and press your desired key.
 
 
-<img width="858" height="626" alt="Снимок экрана 2026-05-11 185741" src="https://github.com/user-attachments/assets/03cba555-9428-4003-9b65-59b9663dda72" />
+<img width="1140" height="604" alt="изображение" src="https://github.com/user-attachments/assets/147d1f84-5bb7-4bb4-9bee-b46361ec6e23" />
+
 
 ## ⚠️ Disclaimer & Caution
 
