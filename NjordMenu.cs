@@ -3,12 +3,14 @@
 
 using AmongUs.Data.Player;
 using AmongUs.GameOptions;
+using AmongUs.InnerNet.GameDataMessages;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Unity.IL2CPP;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using HarmonyLib;
 using Hazel;
+using Il2CppInterop.Runtime.Attributes;
 using Il2CppInterop.Runtime.Injection;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using InnerNet;
@@ -17,21 +19,23 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
+using TMPro;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.Events;
 using UnityEngine.Playables;
+using UnityEngine.UI;
 using static NjordMenu.NjordMenuGUI;
 using static Rewired.UI.ControlMapper.ControlMapper;
 using Color = UnityEngine.Color;
 using Object = UnityEngine.Object;
 using Vector3 = UnityEngine.Vector3;
-using System.Reflection;
-using TMPro;
-using UnityEngine.Events;
-using UnityEngine.UI;
+using System.Runtime.CompilerServices;
 namespace NjordMenu
 {
-    [BepInPlugin("com.njord.menu", "NjordMenu", "1.2.3")]
+    [BepInPlugin("com.njord.menu", "NjordMenu", "1.2.4")]
     public class Plugin : BasePlugin
     {
         public static Plugin Instance { get; private set; } = null!;
@@ -96,10 +100,28 @@ namespace NjordMenu
         public static byte selectedMorphTargetId = 255;
         public static bool unlockCosmetics = true;
         public static bool moreLobbyInfo = true;
+
         public static Dictionary<string, KeyCode> keyBinds = new Dictionary<string, KeyCode>();
         public static string bindingAction = "";
+
+        public static string L(string eng, string rus)
+        {
+            try
+            {
+                if (DestroyableSingleton<TranslationController>.InstanceExists)
+                {
+                    string currentLang = DestroyableSingleton<TranslationController>.Instance.currentLanguage.ToString().ToLower();
+                    if (currentLang.Contains("russian") || currentLang.Contains("ru"))
+                        return rus;
+                }
+            }
+            catch { }
+            return eng;
+        }
+
         private int currentGeneralSubTab = 0;
-        private string[] generalSubTabs = { "INFORMATION", "KEYBINDS" };
+        private string[] generalSubTabs => new string[] { L("INFORMATION", "ИНФОРМАЦИЯ"), L("KEYBINDS", "БИНДЫ") };
+
         public static KeyCode menuToggleKey = KeyCode.Insert;
         public static KeyCode bindMassMorph = KeyCode.None;
         public static KeyCode bindSpawnLobby = KeyCode.None;
@@ -111,6 +133,8 @@ namespace NjordMenu
         public static KeyCode bindEndImpDC = KeyCode.None;
         public static KeyCode bindEndHnsDC = KeyCode.None;
 
+        private bool isScannerActiveFlag = false;
+        private bool isCamsActiveFlag = false;
         public static bool isWaitingForBind = false;
         public static bool isWaitBindMassMorph = false;
         public static bool isWaitBindSpawnLobby = false;
@@ -128,13 +152,15 @@ namespace NjordMenu
         public static bool tpToCursor = false;
         public static bool dragToCursor = false;
         public static float walkSpeed = 1f;
+
         public static bool DetailedJoinInfo = true;
         private static List<byte> lastPlayerIds = new List<byte>();
         private static Dictionary<byte, float> pendingJoinTimers = new Dictionary<byte, float>();
-       
+
         public static float engineSpeed = 1f;
         public static bool invertControls = false;
         public static bool autoFollowCursor = false;
+
         public static int fakeRoleIdx = 0;
         public static RoleTypes[] forceRoleOptions = { RoleTypes.Crewmate, RoleTypes.Impostor, RoleTypes.Engineer, RoleTypes.Scientist, RoleTypes.Shapeshifter, RoleTypes.GuardianAngel };
         public static bool NoShapeshiftAnim = false;
@@ -146,6 +172,7 @@ namespace NjordMenu
         public static bool enableColorCommand = false;
         public static bool hostChatColor = false;
         public static Color hostChatColorValue = new Color32(0, 128, 128, 255);
+
         public static bool showMenu = false;
         public static Rect windowRect = new Rect(100, 100, 750, 480);
         public static bool freecam = false;
@@ -153,7 +180,6 @@ namespace NjordMenu
         public static bool cameraZoom = false;
         public static bool RevealVotesEnabled = false;
 
-       
         public static Color currentAccentColor = new Color(1f, 0.549f, 0f, 1f);
         public static bool rgbMenuMode = false;
         private float rgbMenuHue = 0f;
@@ -168,8 +194,11 @@ namespace NjordMenu
             "Blood Red",
             "Hot Pink", "Pale Mauve", "Lilac",
             "Lavender", "Deep Indigo", "Indigo",
-            "Med Slate Blue", "Slate Blue", "Navy", "Slate Grey"
+            "Med Slate Blue", "Slate Blue", "Navy", "Slate Grey",
+            "Terracotta", "Dusty Rose", "Cerulean", "Burgundy", "Champagne",
+            "Deep Plum", "Coral", "Mustard", "Charcoal", "Sage"
         };
+
         private Color[] menuColors = {
             new Color32(51, 51, 255, 255), new Color(0.192f, 0.290f, 0.196f, 1f), new Color(0f, 0.502f, 0f, 1f), new Color(0.235f, 0.702f, 0.443f, 1f), new Color(0.243f, 0.706f, 0.537f, 1f), new Color(0.498f, 1f, 0f, 1f),
             new Color(0.996f, 0.718f, 0.082f, 1f), new Color(0.812f, 0.651f, 0.004f, 1f),
@@ -177,15 +206,313 @@ namespace NjordMenu
             new Color(0.871f, 0.071f, 0.149f, 1f),
             new Color(0.992f, 0.529f, 0.859f, 1f), new Color(0.882f, 0.678f, 0.800f, 1f), new Color(0.784f, 0.635f, 0.784f, 1f),
             new Color(0.925f, 0.686f, 0.996f, 1f), new Color(0.314f, 0.267f, 0.675f, 1f), new Color(0.294f, 0f, 0.51f, 1f),
-            new Color(0.482f, 0.408f, 0.933f, 1f), new Color(0.416f, 0.353f, 0.804f, 1f), new Color(0f, 0f, 0.502f, 1f), new Color(0.439f, 0.502f, 0.565f, 1f)
+            new Color(0.482f, 0.408f, 0.933f, 1f), new Color(0.416f, 0.353f, 0.804f, 1f), new Color(0f, 0f, 0.502f, 1f), new Color(0.439f, 0.502f, 0.565f, 1f),
+            new Color32(217, 98, 70, 255),    new Color32(199, 141, 150, 255),  new Color32(0, 123, 167, 255),    new Color32(107, 29, 47, 255),    new Color32(247, 231, 206, 255),  new Color32(75, 31, 63, 255),     new Color32(255, 127, 80, 255),   new Color32(212, 163, 37, 255),   new Color32(54, 69, 79, 255),     new Color32(156, 175, 136, 255)
         };
+
+        private string[] tabNames => new string[] { L("GENERAL", "ОБЩИЕ"), L("SELF", "ИГРОК"), L("VISUALS", "ВИЗУАЛ"), L("PLAYERS", "ИГРОКИ"), L("SABOTAGES", "САБОТАЖИ"), L("HOST ONLY", "ХОСТ"), L("OUTFITS", "ОДЕЖДА"), L("MENU", "МЕНЮ"), L("MAPS", "КАРТЫ"), L("ANIMATIONS", "АНИМАЦИИ") };
 
         public static float speedMultiplier = 1f;
         public static bool noSettingLimit = false;
         public static float globalRoomColorId = 0f;
+
         private int currentHostOnlySubTab = 0;
-        private string[] hostOnlySubTabs = { "LOBBY CONTROLS", "ROLE MANAGER", "ANTI CHEAT", "AUTO HOST" };
-        private string[] tabNames = { "GENERAL", "SELF", "VISUALS", "PLAYERS", "ROLES", "SABOTAGES", "HOST ONLY", "OUTFITS", "MENU" };
+        private string[] hostOnlySubTabs => new string[] { L("LOBBY CONTROLS", "КОНТРОЛЬ ЛОББИ"), L("ROLE MANAGER", "МЕНЕДЖЕР РОЛЕЙ"), L("ANTI CHEAT", "АНТИ-ЧИТ"), L("AUTO HOST", "АВТО ХОСТ") };
+        public static bool UseSnapToRPC = true;
+        private static bool isSkeldFlipped = false;
+        public static float selectedMapSpawnIdx = 0f;
+        public static string[] mapSpawnNames = { "The Skeld", "Mira HQ", "Polus", "The Airship", "The Fungle" };
+
+        public static bool FlippedSkeld
+        {
+            get { return isSkeldFlipped; }
+            set
+            {
+                if (AmongUsClient.Instance == null || isSkeldFlipped == value) return;
+                var temp = AmongUsClient.Instance.ShipPrefabs[3];
+                AmongUsClient.Instance.ShipPrefabs[3] = AmongUsClient.Instance.ShipPrefabs[0];
+                AmongUsClient.Instance.ShipPrefabs[0] = temp;
+                isSkeldFlipped = value;
+            }
+        }
+      
+        [HarmonyPatch(typeof(TextBoxTMP), nameof(TextBoxTMP.Start))]
+        public static class AllowSymbols_TextBoxTMP_Start_Patch
+        {
+            public static void Postfix(TextBoxTMP __instance)
+            {
+                __instance.allowAllCharacters = true;
+                __instance.AllowSymbols = true;
+                __instance.AllowEmail = true;
+            }
+        }
+        [HarmonyPatch(typeof(ChatController), nameof(ChatController.Update))]
+        public static class ChatJailbreak_ChatController_Update_Postfix
+        {
+            public static void Postfix(ChatController __instance)
+            {
+                if (__instance == null || __instance.freeChatField == null || __instance.freeChatField.textArea == null) return;
+                if (NjordMenuGUI.enableFastChat && __instance.timeSinceLastMessage < 0.9f)
+                {
+                    __instance.timeSinceLastMessage = 0.9f;
+                }
+                __instance.freeChatField.textArea.allowAllCharacters = true;
+                __instance.freeChatField.textArea.AllowSymbols = true;
+                __instance.freeChatField.textArea.AllowEmail = true;
+                __instance.freeChatField.textArea.characterLimit = NjordMenuGUI.enableExtendedChat ? 120 : 100;
+            }
+        }
+        [HarmonyPatch(typeof(ChatController), nameof(ChatController.SendFreeChat))]
+        public static class AllowURLS_ChatController_SendFreeChat_Patch
+        {
+            public static bool Prefix(ChatController __instance)
+            {
+                if (!NjordMenuGUI.allowLinksAndSymbols) return true;
+                string text = __instance.freeChatField.Text;
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    PlayerControl.LocalPlayer.RpcSendChat(text);
+                    __instance.freeChatField.textArea.SetText(string.Empty, string.Empty);
+                }
+                return false;
+            }
+        }
+        public static bool autoKickBugs = false;
+        public static float autoKickTimer = 5f;
+        public static Dictionary<byte, float> fortegreenTimer = new Dictionary<byte, float>();
+        [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetColor))]
+        public static class AutoKickBugs_Patch
+        {
+            public static void Postfix(PlayerControl __instance, byte bodyColor)
+            {
+                if (!NjordMenuGUI.autoKickBugs || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                try
+                {
+                    if (__instance != null && __instance != PlayerControl.LocalPlayer && __instance.Data != null && !__instance.Data.Disconnected)
+                    {
+                        byte pid = __instance.PlayerId;
+                        string colorName = Palette.GetColorName((int)bodyColor);
+                        if (bodyColor == 18 || colorName == "???" || bodyColor >= Palette.PlayerColors.Length)
+                        {
+                            if (!NjordMenuGUI.fortegreenTimer.ContainsKey(pid))
+                            {
+                                NjordMenuGUI.fortegreenTimer[pid] = Time.time + NjordMenuGUI.autoKickTimer;
+                            }
+                        }
+                        else
+                        {
+                            if (NjordMenuGUI.fortegreenTimer.ContainsKey(pid))
+                            {
+                                NjordMenuGUI.fortegreenTimer.Remove(pid);
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        [HarmonyPatch(typeof(VoteBanSystem), nameof(VoteBanSystem.HandleRpc))]
+        public static class VoteBanSystemPatch
+        {
+            public static bool Prefix(VoteBanSystem __instance, byte callId, Hazel.MessageReader reader)
+            {
+                if (!AmongUsClient.Instance.AmHost || !NjordMenuGUI.disableVoteKicks)
+                    return true;
+                if (callId == 26)
+                {
+                    reader.ReadInt32();
+                    reader.ReadInt32();
+                    NjordMenuGUI.ShowNotification("<color=#FFAC1C>[SHIELD]</color> Заблокирована попытка Vote-Kick'а!");
+                    return false;
+                }
+                return true;
+            }
+        }
+        public static bool disableVoteKicks = false;
+      
+
+        [HarmonyPatch(typeof(ShhhBehaviour), nameof(ShhhBehaviour.PlayAnimation))]
+        public static class SkipShhh_Perfect_Patch
+        {
+            public static bool Prefix(ShhhBehaviour __instance, ref Il2CppSystem.Collections.IEnumerator __result)
+            {
+                if (!NjordMenuGUI.skipShhhAnim || __instance == null) return true;
+                __instance.gameObject.SetActive(false);
+                __result = FastSkip().WrapToIl2Cpp();
+                return false;
+            }
+
+            private static System.Collections.IEnumerator FastSkip() { yield break; }
+        }
+        private void SpawnMap(int mapId)
+        {
+            try
+            {
+                if ((UnityEngine.Object)(object)AmongUsClient.Instance == (UnityEngine.Object)null || AmongUsClient.Instance.ShipPrefabs == null)
+                {
+                    System.Console.WriteLine("[MAP] AmongUsClient or ShipPrefabs is null");
+                    return;
+                }
+                int realMapId = mapId;
+                if (mapId == 3) realMapId = 4;
+                if (mapId == 4) realMapId = 5;
+                if (realMapId >= AmongUsClient.Instance.ShipPrefabs.Count)
+                {
+                    System.Console.WriteLine("[MAP] Invalid map ID");
+                    return;
+                }
+                BepInEx.Unity.IL2CPP.Utils.MonoBehaviourExtensions.StartCoroutine(this, CoSpawnMap(realMapId));
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("[MAP ERROR] Failed to spawn map: " + ex.Message);
+            }
+        }
+
+        [HideFromIl2Cpp]
+        private System.Collections.IEnumerator CoSpawnMap(int mapId)
+        {
+            AmongUsClient.Instance.ShipLoadingAsyncHandle = AmongUsClient.Instance.ShipPrefabs[mapId].InstantiateAsync((Transform)null, false);
+            yield return AmongUsClient.Instance.ShipLoadingAsyncHandle;
+            ShipStatus.Instance = AmongUsClient.Instance.ShipLoadingAsyncHandle.Result.GetComponent<ShipStatus>();
+            ((InnerNetClient)AmongUsClient.Instance).Spawn(((Component)ShipStatus.Instance).GetComponent<InnerNetObject>(), -2, (SpawnFlags)0);
+            System.Console.WriteLine($"[MAP] Map ID: {mapId} spawned successfully");
+        }
+
+        private void DespawnMap()
+        {
+            try
+            {
+                if (ShipStatus.Instance != null)
+                {
+                    ShipStatus.Instance.Despawn();
+                    System.Console.WriteLine("[MAP] Map despawned successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("[MAP ERROR] Failed to despawn map: " + ex.Message);
+            }
+        }
+
+        private void DespawnCurrentMap()
+        {
+            DespawnMap();
+        }
+
+        [HideFromIl2Cpp]
+        private System.Collections.IEnumerator CoSpawnOverlappedMap(int mapId)
+        {
+            yield return CoSpawnMap(mapId);
+        }
+        public static Dictionary<string, Vector2> skeldTeleportLocations = new Dictionary<string, Vector2>()
+{
+    { "Cafeteria", new Vector2(-0.78f, 2.48f) },
+    { "Weapons", new Vector2(8.04f, 1.24f) },
+    { "Navigation", new Vector2(16.59f, -2.33f) },
+    { "O2", new Vector2(5.15f, -3.12f) },
+    { "Shields", new Vector2(10.15f, -7.64f) },
+    { "Communications", new Vector2(3.87f, -11.08f) },
+    { "Storage", new Vector2(-1.92f, -6.14f) },
+    { "Admin", new Vector2(5.31f, -7.42f) },
+    { "Electrical", new Vector2(-3.37f, -4.84f) },
+    { "Security", new Vector2(-5.69f, -3.07f) },
+    { "Medbay", new Vector2(-8.61f, -4.30f) },
+    { "Reactor", new Vector2(-20.19f, -2.48f) },
+    { "Upper Engine", new Vector2(-16.84f, 2.47f) },
+    { "Lower Engine", new Vector2(-16.48f, -7.53f) }
+};
+
+        public static Dictionary<string, Vector2> miraTeleportLocations = new Dictionary<string, Vector2>()
+{
+    { "Launchpad", new Vector2(0.12f, -1.5f) },
+    { "Medbay", new Vector2(10.2f, 15.1f) },
+    { "Locker Room", new Vector2(12.5f, 18.5f) },
+    { "Decontamination", new Vector2(14.8f, 22.0f) },
+    { "Reactor", new Vector2(20.5f, 25.0f) },
+    { "Laboratory", new Vector2(26.2f, 22.1f) },
+    { "Office", new Vector2(24.5f, 15.2f) },
+    { "Greenhouse", new Vector2(22.1f, 8.5f) },
+    { "Admin", new Vector2(18.2f, 3.1f) },
+    { "Cafeteria", new Vector2(14.5f, -2.1f) },
+    { "Storage", new Vector2(9.8f, -6.5f) }
+};
+
+        public static Dictionary<string, Vector2> polusTeleportLocations = new Dictionary<string, Vector2>()
+{
+    { "Dropship", new Vector2(0f, 0f) },
+    { "Electrical", new Vector2(5.2f, 12.1f) },
+    { "O2", new Vector2(-12.4f, 8.5f) },
+    { "Security", new Vector2(-18.5f, 2.2f) },
+    { "Decontamination", new Vector2(-25.2f, 1.5f) },
+    { "Specimen Room", new Vector2(-30.1f, -5.2f) },
+    { "Laboratory", new Vector2(-20.5f, -12.1f) },
+    { "Medbay", new Vector2(-8.2f, -15.4f) },
+    { "Communications", new Vector2(8.5f, -12.1f) },
+    { "Weapons", new Vector2(15.2f, -2.5f) }
+};
+
+        public static Dictionary<string, Vector2> airshipTeleportLocations = new Dictionary<string, Vector2>()
+{
+    { "Cockpit", new Vector2(-30f, 15f) },
+    { "Vault", new Vector2(-15f, 15f) },
+    { "Brig", new Vector2(-5f, 10f) },
+    { "Meeting Room", new Vector2(10f, 12f) },
+    { "Records", new Vector2(25f, 12f) },
+    { "Lounge", new Vector2(35f, 8f) },
+    { "Kitchen", new Vector2(25f, -5f) }
+};
+
+        public static Dictionary<string, Vector2> fungleTeleportLocations = new Dictionary<string, Vector2>()
+{
+    { "Beach", new Vector2(0f, -20f) },
+    { "Jungle", new Vector2(15f, 10f) },
+    { "Lookout", new Vector2(-10f, 25f) },
+    { "Laboratory", new Vector2(-25f, 0f) },
+    { "Storage", new Vector2(5f, -5f) }
+};
+        public static int GetCurrentMapId()
+        {
+            if (AmongUsClient.Instance == null) return 0;
+            if (AmongUsClient.Instance.NetworkMode == NetworkModes.FreePlay)
+            {
+                return AmongUsClient.Instance.TutorialMapId;
+            }
+            else
+            {
+                if (GameOptionsManager.Instance == null || GameOptionsManager.Instance.CurrentGameOptions == null) return 0;
+                return GameOptionsManager.Instance.CurrentGameOptions.MapId;
+            }
+        }
+        private Vector2 mapsScrollPos = Vector2.zero;
+        public static Dictionary<string, Vector2> GetTeleportLocations()
+        {
+            switch (GetCurrentMapId())
+            {
+                case 0: return skeldTeleportLocations;
+                case 1: return miraTeleportLocations;
+                case 2: return polusTeleportLocations;
+                case 3: return skeldTeleportLocations;
+                case 4: return airshipTeleportLocations;
+                case 5: return fungleTeleportLocations;
+                default: return skeldTeleportLocations;
+            }
+        }
+
+        public static void TeleportTo(Vector2 position)
+        {
+            if (PlayerControl.LocalPlayer == null || PlayerControl.LocalPlayer.NetTransform == null) return;
+            if (UseSnapToRPC)
+            {
+                PlayerControl.LocalPlayer.NetTransform.RpcSnapTo(position);
+            }
+            else
+            {
+                PlayerControl.LocalPlayer.NetTransform.SnapTo(position);
+            }
+        }
+
         private int currentTab = 0;
         private int targetTabIndex = 0;
         private float tabTransitionProgress = 1f;
@@ -203,61 +530,185 @@ namespace NjordMenu
             }
             GUILayout.EndHorizontal();
             GUILayout.Space(8);
-
             if (currentAutoHostSubTab == 0) DrawLobbyControls();
             else if (currentAutoHostSubTab == 1) DrawPlayersRoles();
             else if (currentAutoHostSubTab == 2) DrawAntiCheatTab();
             else if (currentAutoHostSubTab == 3) DrawAutoHostTab();
         }
 
-        private void DrawAutoHostTab()
+        private void DrawMapsTab()
         {
             GUILayout.BeginVertical(boxStyle);
-            GUILayout.Label("AUTO HOST SYSTEM", headerStyle);
-
-            var snapshot = NjordAutoHostService.GetStatusSnapshot();
-            GUILayout.Label($"<color=#aaaaaa>Status:</color> <color=#FFAC1C>{snapshot.State}</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13 });
-            GUILayout.Space(10);
-
-            AutoHostEnabled = DrawToggle(AutoHostEnabled, "Enable Auto Host", 250);
-            GUILayout.Space(5);
-            AutoReturnLobbyAfterMatch = DrawToggle(AutoReturnLobbyAfterMatch, "Auto Return To Lobby", 250);
-            GUILayout.Space(5);
-            AutoHostNotifications = DrawToggle(AutoHostNotifications, "Show Notifications", 250);
-            GUILayout.Space(5);
-            AutoHostWaitLoadedPlayers = DrawToggle(AutoHostWaitLoadedPlayers, "Wait For Players To Load", 250);
-            GUILayout.Space(5);
-            AutoHostCancelBelowMin = DrawToggle(AutoHostCancelBelowMin, "Cancel Countdown If Player Leaves", 250);
-            GUILayout.Space(5);
-            AutoHostInstantStart = DrawToggle(AutoHostInstantStart, "Instant Start (No 5s Wait)", 250);
-            GUILayout.Space(5);
-            AutoHostForceLastMinute = DrawToggle(AutoHostForceLastMinute, "Force Start Last Minute", 250);
-
+            GUILayout.Label(L("LOBBY CONTROL", "КОНТРОЛЬ ЛОББИ"), headerStyle);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(L("Spawn Lobby", "Создать лобби"), btnStyle, GUILayout.Height(30))) SpawnLobby();
+            if (GUILayout.Button(L("Despawn Lobby", "Удалить лобби"), btnStyle, GUILayout.Height(30))) DespawnLobby();
+            GUILayout.EndHorizontal();
             GUILayout.Space(15);
-
+            GUILayout.Label(L("MAP CONTROL", "КОНТРОЛЬ КАРТЫ"), headerStyle);
+            isManualMapSpawn = DrawToggle(isManualMapSpawn, L("Manual Map Spawn Mode", "Ручной спавн карты"), 250);
+            GUILayout.Space(10);
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"Min Players: {AutoHostMinPlayers}", GUILayout.Width(160));
-            AutoHostMinPlayers = (int)GUILayout.HorizontalSlider(AutoHostMinPlayers, 1f, 15f, sliderStyle, sliderThumbStyle, GUILayout.Width(350));
+            GUILayout.Label(L("Select Map:", "Выбор карты:"), GUILayout.Width(100));
+            selectedMapSpawnIdx = (int)GUILayout.HorizontalSlider((int)selectedMapSpawnIdx, 0, mapSpawnNames.Length - 1, sliderStyle, sliderThumbStyle, GUILayout.Width(200));
+            GUILayout.Label($"<color=#{ColorUtility.ToHtmlStringRGB(currentAccentColor)}>{mapSpawnNames[(int)selectedMapSpawnIdx]}</color>", new GUIStyle(GUI.skin.label) { richText = true });
+            GUILayout.EndHorizontal();
+            GUILayout.Space(10);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(L("Spawn Map", "Создать карту"), activeTabStyle, GUILayout.Height(30))) SpawnMap((int)selectedMapSpawnIdx);
+            if (GUILayout.Button(L("Despawn Map", "Удалить карту"), btnStyle, GUILayout.Height(30))) DespawnCurrentMap();
+            GUILayout.EndHorizontal();
+            GUILayout.Space(15);
+            GUILayout.Label(L("ROOM TELEPORTS (IN-GAME)", "ТЕЛЕПОРТЫ ПО КОМНАТАМ (В ИГРЕ)"), headerStyle);
+            if (ShipStatus.Instance != null && PlayerControl.LocalPlayer != null)
+            {
+                mapsScrollPos = GUILayout.BeginScrollView(mapsScrollPos, GUILayout.Height(160));
+                var locations = GetTeleportLocations();
+                int columns = 3;
+                int count = 0;
+                GUILayout.BeginHorizontal();
+                foreach (var loc in locations)
+                {
+                    if (GUILayout.Button(loc.Key, btnStyle, GUILayout.Width(135), GUILayout.Height(30)))
+                    {
+                        TeleportTo(loc.Value);
+                        ShowNotification($"<color=#00FF00>[TELEPORT]</color> {L("Moved to:", "Перемещен в:")} <b>{loc.Key}</b>");
+                    }
+                    count++;
+                    if (count % columns == 0)
+                    {
+                        GUILayout.EndHorizontal();
+                        GUILayout.BeginHorizontal();
+                    }
+                }
+                GUILayout.EndHorizontal();
+                GUILayout.EndScrollView();
+            }
+            else
+            {
+                GUILayout.Label($"<color=#777777>{L("Teleports are only available when you are on a map.", "Телепорты доступны только когда вы находитесь на карте.")}</color>", new GUIStyle(GUI.skin.label) { richText = true, alignment = TextAnchor.MiddleCenter });
+            }
+            GUILayout.EndVertical();
+        }
+
+        private void DrawChatSettingsTab()
+        {
+            GUILayout.BeginVertical(boxStyle);
+            GUILayout.Label(L("CHAT SETTINGS & LOGS", "НАСТРОЙКИ ЧАТА И ЛОГИ"), headerStyle);
+            GUILayout.Space(10);
+            string hexColor = ColorUtility.ToHtmlStringRGB(currentAccentColor);
+            GUILayout.BeginHorizontal();
+            GUILayout.BeginVertical(GUILayout.Width(300));
+            GUILayout.Label($"<b><color=#{hexColor}>{L("LOCAL FEATURES", "ЛОКАЛЬНЫЕ ФУНКЦИИ")}</color></b>", toggleLabelStyle);
+            GUILayout.Space(6);
+            alwaysChat = DrawToggle(alwaysChat, L("Always Show Chat", "Всегда показывать чат"), 280);
+            GUILayout.Space(2);
+            readGhostChat = DrawToggle(readGhostChat, L("Read Ghost Chat", "Читать чат призраков"), 280);
+            GUILayout.Space(2);
+            enableExtendedChat = DrawToggle(enableExtendedChat, L("Extended Chat (120 chars)", "Длинный чат (120 симв.)"), 280);
+            GUILayout.Space(2);
+            enableFastChat = DrawToggle(enableFastChat, L("Fast Chat (No Cooldown)", "Быстрый чат (Без КД)"), 280);
+            GUILayout.Space(2);
+            allowLinksAndSymbols = DrawToggle(allowLinksAndSymbols, L("Allow Links & Symbols", "Разрешить ссылки и символы"), 280);
+            GUILayout.EndVertical();
+            GUILayout.BeginVertical(GUILayout.ExpandWidth(true));
+            GUILayout.Label($"<b><color=#{hexColor}>{L("UTILITY OPTIONS", "УТИЛИТЫ")}</color></b>", toggleLabelStyle);
+            GUILayout.Space(6);
+            enableChatHistory = DrawToggle(enableChatHistory, L("Chat History (Up/Down)", "История чата (Стрелочки)"), 280);
+            GUILayout.Space(2);
+            enableClipboard = DrawToggle(enableClipboard, L("Clipboard (Ctrl+C/V)", "Буфер обмена (Ctrl+C/V)"), 280);
+            GUILayout.Space(2);
+            enableChatLog = DrawToggle(enableChatLog, L("Save Chat Log to File", "Сохранять лог чата в файл"), 280);
+            GUILayout.Space(8);
+            GUILayout.Label($"<b><color=#{hexColor}>{L("HOST LOBBY OPTIONS", "НАСТРОЙКИ ХОСТА")}</color></b>", toggleLabelStyle);
+            GUILayout.Space(6);
+            enableColorCommand = DrawToggle(enableColorCommand, L("Enable /color command", "Разрешить команду /color"), 280);
+            GUILayout.Space(2);
+            blockFortegreenChat = DrawToggle(blockFortegreenChat, L("Block Fortegreen Chat", "Запрет чата Fortegreen"), 280);
+            GUILayout.Space(2);
+            blockRainbowChat = DrawToggle(blockRainbowChat, L("Block Rainbow Chat", "Запрет радужного чата"), 280);
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
+            GUILayout.Space(12);
+            GUILayout.Label($"<b><color=#{hexColor}>{L("COMMANDS & INFO", "КОМАНДЫ И ИНФОРМАЦИЯ")}</color></b>", toggleLabelStyle);
+            GUILayout.Space(4);
+            GUILayout.Label($"<color=#FFAC1C><b>{L("Whisper:", "Шепот:")}</b></color> /w, /pm, /msg [Name/ID/Color] [Text]", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 12 });
+            GUILayout.Label($"<color=#777777>{L("Sends a private message to a player on your screen only.", "Отправляет личное сообщение выбранному игроку (видит только он и вы).")}</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11, wordWrap = true });
+            GUILayout.Space(6);
+            GUILayout.Label($"<color=#777777><b>Log Info:</b> {L("ChatLog.txt clears every 3 game restarts.", "Файл ChatLog.txt очищается каждые 3 запуска игры.")}</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11, wordWrap = true });
+            GUILayout.EndVertical();
+        }
+
+        private void DrawAntiCheatTab()
+        {
+            GUILayout.BeginVertical(boxStyle);
+            GUILayout.Label(L("ANTI CHEAT", "АНТИ-ЧИТ"), headerStyle);
+            GUILayout.Space(5);
+            enableLocalPetSpamDrop = DrawToggle(enableLocalPetSpamDrop, L("Block Pet Spam (Local Drop)", "Блок спама питомцем (Локально)"), 250);
+            GUILayout.Space(5);
+            enableHostPetSpamBan = DrawToggle(enableHostPetSpamBan, L("Auto-Ban Pet Spammers (Host)", "Авто-бан за спам питомцем (Хост)"), 250);
+            GUILayout.Space(15);
+            GUILayout.Label(L("LOBBY PROTECTIONS", "ЗАЩИТА ЛОББИ"), headerStyle);
+            disableVoteKicks = DrawToggle(disableVoteKicks, L("Disable Vote Kicks (Host)", "Запрет кика голосованием (Хост)"), 250);
+            GUILayout.Space(5);
+            autoKickBugs = DrawToggle(autoKickBugs, L("Auto-Kick Bugged Players (Fortegreen)", "Авто-кик багнутых игроков (Fortegreen)"), 250);
+            if (autoKickBugs)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"{L("Kick Delay:", "Задержка кика:")} {Mathf.RoundToInt(autoKickTimer)}s", GUILayout.Width(150));
+                autoKickTimer = GUILayout.HorizontalSlider(autoKickTimer, 1f, 15f, sliderStyle, sliderThumbStyle, GUILayout.Width(100));
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.Space(15);
+            GUILayout.Label(L("BAN LIST", "БАН ЛИСТ"), headerStyle);
+            autoBanEnabled = DrawToggle(autoBanEnabled, L("Auto-Ban Blacklisted Players", "Авто-бан игроков из списка"), 250);
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            string defaultBanText = L("Enter Friend Code", "Введите Friend Code");
+            string banDisp = isEditingBan ? banInput + "_" : (string.IsNullOrEmpty(banInput) ? defaultBanText : banInput);
+            if (GUILayout.Button(banDisp, isEditingBan ? activeTabStyle : inputBlockStyle, GUILayout.Width(200f), GUILayout.Height(25f)))
+            {
+                isEditingBan = !isEditingBan;
+                ResetAllBindWaits();
+            }
+            if (GUILayout.Button(L("ADD", "ДОБАВИТЬ"), btnStyle, GUILayout.Width(80f), GUILayout.Height(25f)))
+            {
+                if (!string.IsNullOrWhiteSpace(banInput))
+                {
+                    AddToBanList(banInput.Trim(), "Manual", "Unknown", "Manual ban");
+                    banInput = "";
+                    isEditingBan = false;
+                }
+            }
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"Start Delay: {AutoHostStartDelaySeconds}s", GUILayout.Width(160));
-            AutoHostStartDelaySeconds = GUILayout.HorizontalSlider(AutoHostStartDelaySeconds, 0f, 180f, sliderStyle, sliderThumbStyle, GUILayout.Width(350));
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"Fast Start Players: {AutoHostFastStartPlayers}", GUILayout.Width(160));
-            AutoHostFastStartPlayers = (int)GUILayout.HorizontalSlider(AutoHostFastStartPlayers, 0f, 15f, sliderStyle, sliderThumbStyle, GUILayout.Width(350));
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"Fast Start Delay: {AutoHostFastStartDelaySeconds}s", GUILayout.Width(160));
-            AutoHostFastStartDelaySeconds = GUILayout.HorizontalSlider(AutoHostFastStartDelaySeconds, 0f, 60f, sliderStyle, sliderThumbStyle, GUILayout.Width(350));
-            GUILayout.EndHorizontal();
-
+            banListScroll = GUILayout.BeginScrollView(banListScroll, GUILayout.Height(270));
+            if (bannedEntries.Count == 0)
+            {
+                GUILayout.Label($"<color=#777777>{L("Ban list is empty.", "Бан лист пуст.")}</color>", new GUIStyle(GUI.skin.label) { richText = true, alignment = TextAnchor.MiddleCenter });
+            }
+            else
+            {
+                for (int i = 0; i < bannedEntries.Count; i++)
+                {
+                    string entry = bannedEntries[i];
+                    if (string.IsNullOrWhiteSpace(entry)) continue;
+                    string[] parts = entry.Split('|');
+                    string disp = parts.Length >= 3 ? $"{parts[2]} ({parts[0]})" : entry;
+                    GUILayout.BeginHorizontal(boxStyle);
+                    GUILayout.Label(disp, new GUIStyle(GUI.skin.label) { fontSize = 12 }, GUILayout.Width(220));
+                    GUILayout.FlexibleSpace();
+                    GUIStyle redCrossStyle = new GUIStyle(btnStyle);
+                    redCrossStyle.normal.textColor = new Color(1f, 0.3f, 0.3f);
+                    if (GUILayout.Button("X", redCrossStyle, GUILayout.Width(25), GUILayout.Height(22)))
+                    {
+                        RemoveFromBanList(entry);
+                        break;
+                    }
+                    GUILayout.EndHorizontal();
+                }
+            }
+            GUILayout.EndScrollView();
             GUILayout.EndVertical();
         }
         public static class NjordAutoLobbyReturn
@@ -265,13 +716,11 @@ namespace NjordMenu
             private const float AutoReturnDelaySeconds = 3f;
             private const float AutoReturnRetrySeconds = 0.4f;
             private const int AutoReturnMaxAttempts = 40;
-
             private static int trackedEndGameId;
             private static int exhaustedEndGameId;
             private static int attempt;
             private static float nextAttemptAt;
             private static bool pending;
-
             public static void UpdateLogic()
             {
                 if (!ShouldAutoReturn())
@@ -284,7 +733,6 @@ namespace NjordMenu
                     ResetState();
                     return;
                 }
-
                 EndGameManager val = UnityEngine.Object.FindObjectOfType<EndGameManager>();
                 if (val != null)
                 {
@@ -299,10 +747,8 @@ namespace NjordMenu
                     }
                 }
                 else if (trackedEndGameId == 0) return;
-
                 if (!pending || exhaustedEndGameId == trackedEndGameId || Time.unscaledTime < nextAttemptAt)
                     return;
-
                 bool flag = false;
                 if (val != null)
                 {
@@ -310,20 +756,17 @@ namespace NjordMenu
                     flag = TryClickEndGameButtons(val) || flag;
                 }
                 flag = TryClickGlobalReturnButtons() || flag;
-
                 if (LobbyBehaviour.Instance != null)
                 {
                     ResetState();
                     return;
                 }
-
                 attempt++;
                 if (attempt >= AutoReturnMaxAttempts)
                     pending = false;
                 else
                     nextAttemptAt = Time.unscaledTime + AutoReturnRetrySeconds;
             }
-
             public static void ResetState()
             {
                 trackedEndGameId = 0;
@@ -332,12 +775,10 @@ namespace NjordMenu
                 nextAttemptAt = 0f;
                 pending = false;
             }
-
             private static bool ShouldAutoReturn()
             {
                 return NjordMenuGUI.AutoReturnLobbyAfterMatch || NjordAutoHostService.ShouldReturnAfterMatch;
             }
-
             private static bool TryInvokeEndGameAction(EndGameManager manager)
             {
                 if (manager == null) return false;
@@ -353,7 +794,6 @@ namespace NjordMenu
                 }
                 return false;
             }
-
             private static System.Reflection.MethodInfo FindMethodNoWarn(Type type, string name, Type[] parameters)
             {
                 if (type == null || string.IsNullOrWhiteSpace(name)) return null;
@@ -367,7 +807,6 @@ namespace NjordMenu
                 }
                 return null;
             }
-
             private static bool TryClickEndGameButtons(EndGameManager manager)
             {
                 if (manager == null) return false;
@@ -375,14 +814,12 @@ namespace NjordMenu
                     return true;
                 return TryClickUnityButtons(manager.GetComponentsInChildren<UnityEngine.UI.Button>(true), true);
             }
-
             private static bool TryClickGlobalReturnButtons()
             {
                 if (TryClickPassiveButtons(UnityEngine.Object.FindObjectsOfType<PassiveButton>(), true))
                     return true;
                 return TryClickUnityButtons(UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.Button>(), true);
             }
-
             private static bool TryClickPassiveButtons(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<PassiveButton> buttons, bool onlyActive)
             {
                 if (buttons == null) return false;
@@ -405,7 +842,6 @@ namespace NjordMenu
                 }
                 return false;
             }
-
             private static bool TryClickUnityButtons(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<UnityEngine.UI.Button> buttons, bool onlyActive)
             {
                 if (buttons == null) return false;
@@ -428,7 +864,6 @@ namespace NjordMenu
                 }
                 return false;
             }
-
             private static bool IsLobbyReturnButton(string objectName, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<TMPro.TMP_Text> texts)
             {
                 string input = (objectName ?? string.Empty).ToLowerInvariant();
@@ -448,7 +883,6 @@ namespace NjordMenu
                 }
                 return false;
             }
-
             private static bool ContainsAny(string input, params string[] tokens)
             {
                 if (string.IsNullOrEmpty(input)) return false;
@@ -457,7 +891,6 @@ namespace NjordMenu
                         return true;
                 return false;
             }
-
             private static string StripRichText(string input)
             {
                 if (string.IsNullOrEmpty(input)) return string.Empty;
@@ -476,7 +909,6 @@ namespace NjordMenu
                 return new string(chars, 0, length);
             }
         }
-
         public static class NjordAutoHostService
         {
             public sealed class AutoHostStatusSnapshot
@@ -504,19 +936,16 @@ namespace NjordMenu
                 public bool FastStartActive;
                 public bool ForceStartActive;
             }
-
             private enum AutoHostState
             {
                 Disabled, Idle, Warmup, WaitingPlayers, WaitingLoad,
                 Countdown, Starting, InGame, Returning, Backoff,
             }
-
             private const float TickIntervalSeconds = 0.2f;
             private const float StartRequestGraceSeconds = 7f;
             private const float LobbyLifetimeSeconds = 600f;
             private const float LastMinuteStartSeconds = 60f;
             private const float NotificationCooldownSeconds = 0.75f;
-
             private static AutoHostState state = AutoHostState.Disabled;
             private static string lastReason = "disabled";
             private static float nextTickAt;
@@ -529,20 +958,17 @@ namespace NjordMenu
             private static float lastNotificationAt = -1f;
             private static int lobbyGameId = -1;
             private static int lastCountdownNotice = -1;
-
             public static void Tick()
             {
                 float now = Time.unscaledTime;
                 if (now < nextTickAt) return;
                 nextTickAt = now + TickIntervalSeconds;
-
                 if (!IsEnabled)
                 {
                     ResetLobbyFlow(true);
                     SetState(AutoHostState.Disabled, "Выключен");
                     return;
                 }
-
                 InnerNetClient client = TryGetClient();
                 if (client == null)
                 {
@@ -550,14 +976,12 @@ namespace NjordMenu
                     SetState(AutoHostState.Idle, "Клиент недоступен");
                     return;
                 }
-
                 if (!client.AmHost)
                 {
                     ResetLobbyFlow(false);
                     SetState(AutoHostState.Idle, "Ожидаю хост-контекст");
                     return;
                 }
-
                 if (IsEndGameScreen())
                 {
                     ResetLobbyFlow(false);
@@ -565,14 +989,12 @@ namespace NjordMenu
                         ShouldReturnAfterMatch ? "Возврат в лобби" : "Матч завершен");
                     return;
                 }
-
                 if (IsInMatch())
                 {
                     ResetLobbyFlow(true);
                     SetState(AutoHostState.InGame, "Матч идет");
                     return;
                 }
-
                 if (LobbyBehaviour.Instance == null)
                 {
                     ResetLobbyFlow(false);
@@ -581,11 +1003,9 @@ namespace NjordMenu
                     SetState(AutoHostState.Idle, "Вне лобби");
                     return;
                 }
-
                 TrackLobby(client, now);
                 TickHostedLobby(client, now);
             }
-
             public static AutoHostStatusSnapshot GetStatusSnapshot()
             {
                 AutoHostStatusSnapshot snapshot = new AutoHostStatusSnapshot
@@ -620,14 +1040,12 @@ namespace NjordMenu
                 }
                 return snapshot;
             }
-
             public static void ResetTransientState()
             {
                 nextTickAt = 0f;
                 ResetLobbyFlow(true);
                 SetState(IsEnabled ? AutoHostState.Idle : AutoHostState.Disabled, IsEnabled ? "Сброшен" : "Выключен");
             }
-
             public static string TryStartNow()
             {
                 if (!IsEnabled) return "Автохост выключен.";
@@ -636,7 +1054,6 @@ namespace NjordMenu
                 if (LobbyBehaviour.Instance == null) return "Ручной старт доступен только в лобби.";
                 GameStartManager manager = TryGetGameStartManager();
                 if (manager == null) return "Кнопка старта не найдена.";
-
                 if (!TryConfiguredStart(manager))
                 {
                     EnterBackoff("Ручной старт отклонен");
@@ -650,13 +1067,11 @@ namespace NjordMenu
                 Notify("Автохост", "Матч запускается вручную.");
                 return "Старт отправлен.";
             }
-
             private static void TickHostedLobby(InnerNetClient client, float now)
             {
                 int connectedPlayers = CountLobbyPlayers(client, out int readyPlayers, out string loadingName);
                 bool forceStart = ShouldForceStart(connectedPlayers, out string forceReason);
                 float warmupRemaining = WarmupRemaining;
-
                 if (!forceStart && warmupRemaining > 0.05f)
                 {
                     countdownStartedAt = -1f;
@@ -666,7 +1081,6 @@ namespace NjordMenu
                     SetState(AutoHostState.Warmup, $"Прогрев лобби {Mathf.CeilToInt(warmupRemaining)}с");
                     return;
                 }
-
                 bool waitingForLoad = NjordMenuGUI.AutoHostWaitLoadedPlayers && connectedPlayers > readyPlayers;
                 if (waitingForLoad && !forceStart && !CanBypassLoadWait(now, readyPlayers, connectedPlayers, loadingName))
                 {
@@ -678,7 +1092,6 @@ namespace NjordMenu
                     return;
                 }
                 if (!waitingForLoad) loadWaitStartedAt = -1f;
-
                 if (lastStartIssuedAt > 0f)
                 {
                     if (now - lastStartIssuedAt < StartRequestGraceSeconds)
@@ -690,17 +1103,14 @@ namespace NjordMenu
                     EnterBackoff("Старт не подтвердился");
                     return;
                 }
-
                 if (backoffUntil > now)
                 {
                     SetState(AutoHostState.Backoff, "Пауза после попытки");
                     return;
                 }
-
                 int requiredPlayers = RequiredPlayers;
                 bool enoughPlayers = NjordMenuGUI.AutoHostWaitLoadedPlayers ? readyPlayers >= requiredPlayers : connectedPlayers >= requiredPlayers;
                 bool continueBelowMin = !NjordMenuGUI.AutoHostCancelBelowMin && countdownStartedAt >= 0f && connectedPlayers >= 2;
-
                 if (!forceStart && !enoughPlayers && !continueBelowMin)
                 {
                     if (countdownStartedAt >= 0f)
@@ -711,7 +1121,6 @@ namespace NjordMenu
                     SetState(AutoHostState.WaitingPlayers, $"Игроки {connectedPlayers}/{requiredPlayers}");
                     return;
                 }
-
                 float delay = EffectiveStartDelay(connectedPlayers);
                 if (!forceStart && countdownStartedAt < 0f)
                 {
@@ -721,14 +1130,12 @@ namespace NjordMenu
                     SetState(AutoHostState.Countdown, IsFastStartActive(connectedPlayers) ? "Быстрый старт" : "Минимум игроков набран");
                     Notify("Автохост", $"Старт через {Mathf.CeilToInt(delay)} с.");
                 }
-
                 if (!forceStart && now - countdownStartedAt < delay)
                 {
                     AnnounceCountdown(delay - (now - countdownStartedAt));
                     SetState(AutoHostState.Countdown, "Отсчет");
                     return;
                 }
-
                 GameStartManager manager = TryGetGameStartManager();
                 if (manager == null)
                 {
@@ -740,7 +1147,6 @@ namespace NjordMenu
                     EnterBackoff(forceStart ? "Форс-старт отклонен" : "Старт отклонен");
                     return;
                 }
-
                 countdownStartedAt = -1f;
                 activeCountdownDelay = -1f;
                 backoffUntil = -1f;
@@ -749,7 +1155,6 @@ namespace NjordMenu
                 SetState(AutoHostState.Starting, forceStart ? forceReason : "Старт матча");
                 Notify("Автохост", forceStart ? forceReason : "Минимум набран, запускаю матч.");
             }
-
             private static void TrackLobby(InnerNetClient client, float now)
             {
                 int gameId;
@@ -760,7 +1165,6 @@ namespace NjordMenu
                 ResetLobbyFlow(true);
                 SetState(AutoHostState.WaitingPlayers, "Новое лобби");
             }
-
             private static void AnnounceCountdown(float remaining)
             {
                 int whole = Mathf.CeilToInt(Mathf.Max(0f, remaining));
@@ -771,7 +1175,6 @@ namespace NjordMenu
                     Notify("Автохост", $"Старт через {whole} с.");
                 }
             }
-
             private static bool TryConfiguredStart(GameStartManager manager)
             {
                 if (manager == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || LobbyBehaviour.Instance == null)
@@ -790,7 +1193,6 @@ namespace NjordMenu
                 }
                 catch { return false; }
             }
-
             private static void EnterBackoff(string reason)
             {
                 countdownStartedAt = -1f;
@@ -802,7 +1204,6 @@ namespace NjordMenu
                 SetState(AutoHostState.Backoff, reason);
                 Notify("Автохост: пауза", reason);
             }
-
             private static void ResetLobbyFlow(bool clearBackoff)
             {
                 countdownStartedAt = -1f;
@@ -810,19 +1211,16 @@ namespace NjordMenu
                 lastCountdownNotice = -1;
                 if (clearBackoff) backoffUntil = -1f;
             }
-
             private static void SetState(AutoHostState nextState, string reason)
             {
                 if (!string.IsNullOrWhiteSpace(reason)) lastReason = reason.Trim();
                 state = nextState;
             }
-
             private static int CountLobbyPlayers(InnerNetClient client, out int readyPlayers, out string loadingName)
             {
                 readyPlayers = 0;
                 loadingName = "игрок";
                 if (client == null || client.allClients == null) return 0;
-
                 int connected = 0;
                 try
                 {
@@ -840,7 +1238,6 @@ namespace NjordMenu
                 catch { return CountReadyPlayerControls(out readyPlayers); }
                 return connected;
             }
-
             private static int CountReadyPlayerControls(out int readyPlayers)
             {
                 readyPlayers = 0;
@@ -860,7 +1257,6 @@ namespace NjordMenu
                 }
                 catch { return 0; }
             }
-
             private static bool IsReady(ClientData data)
             {
                 try
@@ -870,24 +1266,20 @@ namespace NjordMenu
                 }
                 catch { return false; }
             }
-
             private static bool IsDisconnected(ClientData data)
             {
                 try { return data.Character != null && data.Character.Data != null && data.Character.Data.Disconnected; }
                 catch { return false; }
             }
-
             private static GameStartManager TryGetGameStartManager()
             {
                 try { if (DestroyableSingleton<GameStartManager>.InstanceExists) return DestroyableSingleton<GameStartManager>.Instance; } catch { }
                 try { return UnityEngine.Object.FindObjectOfType<GameStartManager>(); } catch { return null; }
             }
-
             private static InnerNetClient TryGetClient()
             {
                 try { return AmongUsClient.Instance == null ? null : (InnerNetClient)AmongUsClient.Instance; } catch { return null; }
             }
-
             private static bool CanBypassLoadWait(float now, int readyPlayers, int connectedPlayers, string loadingName)
             {
                 if (readyPlayers < RequiredPlayers) { loadWaitStartedAt = -1f; return false; }
@@ -902,7 +1294,6 @@ namespace NjordMenu
                 SetState(AutoHostState.Countdown, "Прогрузка задержалась, старт по готовым");
                 return true;
             }
-
             private static bool ShouldForceStart(int connectedPlayers, out string reason)
             {
                 int minPlayers = ForceMinPlayers;
@@ -920,13 +1311,11 @@ namespace NjordMenu
                 reason = string.Empty;
                 return false;
             }
-
             private static bool IsFastStartActive(int connectedPlayers)
             {
                 int threshold = Mathf.Clamp(NjordMenuGUI.AutoHostFastStartPlayers, 0, 15);
                 return threshold > 0 && connectedPlayers >= threshold;
             }
-
             private static float EffectiveStartDelay(int connectedPlayers)
             {
                 float delay = StartDelaySeconds;
@@ -934,14 +1323,11 @@ namespace NjordMenu
                     delay = Mathf.Min(delay, Mathf.Clamp(NjordMenuGUI.AutoHostFastStartDelaySeconds, 0, 60));
                 return delay;
             }
-
             private static bool IsInMatch() => ShipStatus.Instance != null && LobbyBehaviour.Instance == null && !IsEndGameScreen();
-
             private static bool IsEndGameScreen()
             {
                 try { return UnityEngine.Object.FindObjectOfType<EndGameManager>() != null; } catch { return false; }
             }
-
             private static void Notify(string title, string detail)
             {
                 if (!NjordMenuGUI.AutoHostNotifications) return;
@@ -950,32 +1336,29 @@ namespace NjordMenu
                 lastNotificationAt = now;
                 NjordMenuGUI.ShowNotification($"<color=#FF00FF>[{title}]</color> {detail}");
             }
-
             private static string FormatState(AutoHostState value)
             {
                 return value switch
                 {
-                    AutoHostState.Disabled => "Выключен",
-                    AutoHostState.Idle => "Ожидание",
-                    AutoHostState.Warmup => "Прогрев",
-                    AutoHostState.WaitingPlayers => "Ждет игроков",
-                    AutoHostState.WaitingLoad => "Ждет прогрузку",
-                    AutoHostState.Countdown => "Отсчет",
-                    AutoHostState.Starting => "Запуск",
-                    AutoHostState.InGame => "В игре",
-                    AutoHostState.Returning => "Возврат",
-                    AutoHostState.Backoff => "Пауза",
+                    AutoHostState.Disabled => L("Disabled", "Выключен"),
+                    AutoHostState.Idle => L("Idle", "Ожидание"),
+                    AutoHostState.Warmup => L("Warmup", "Прогрев"),
+                    AutoHostState.WaitingPlayers => L("Waiting for players", "Ждет игроков"),
+                    AutoHostState.WaitingLoad => L("Waiting for load", "Ждет прогрузку"),
+                    AutoHostState.Countdown => L("Countdown", "Отсчет"),
+                    AutoHostState.Starting => L("Starting", "Запуск"),
+                    AutoHostState.InGame => L("In Game", "В игре"),
+                    AutoHostState.Returning => L("Returning", "Возврат"),
+                    AutoHostState.Backoff => L("Backoff", "Пауза"),
                     _ => value.ToString(),
                 };
             }
-
             private static string CleanName(string value)
             {
                 if (string.IsNullOrWhiteSpace(value)) return "игрок";
                 string clean = value.Replace("\r", " ").Replace("\n", " ").Trim();
                 return clean.Length <= 18 ? clean : clean.Substring(0, 17) + "...";
             }
-
             public static bool IsEnabled => NjordMenuGUI.AutoHostEnabled;
             public static bool ShouldReturnAfterMatch => IsEnabled && NjordMenuGUI.AutoReturnLobbyAfterMatch;
             private static bool ForceLastMinuteEnabled => NjordMenuGUI.AutoHostForceLastMinute;
@@ -992,13 +1375,12 @@ namespace NjordMenu
         private int currentVisualsSubTab = 0;
         private string[] visualsSubTabs = { "IN-GAME" };
         private int currentSelfSubTab = 0;
-        private string[] selfSubTabs = { "SPOOF", "MOVEMENT" };
+        private string[] selfSubTabs = { "SPOOF", "MOVEMENT", "ROLES", "CHAT" };
         public static bool fakeStartCounterTroll = false;
         public static bool fakeStartCounterCustom = false;
         public static string fakeStartInput = "69";
         public static bool isEditingFakeStart = false;
         public static float customStartTimer = -1f;
-
         public static bool localRainbow = false;
         public static List<byte> rainbowPlayers = new List<byte>();
         public static float colorTimer = 0f;
@@ -1006,37 +1388,21 @@ namespace NjordMenu
         private Vector2 playerListScrollPos = Vector2.zero;
         private Vector2 playerActionScrollPos = Vector2.zero;
         private byte selectedHydraPlayerId = 255;
-
         public static string spoofLevelString = "100";
         public static string customNameInput = "хыхых";
         public static bool isEditingLevel = false;
         public static bool isEditingName = false;
         public static bool enablePlatformSpoof = true;
         public static int currentPlatformIndex = 1;
-
         public static string[] platformNames = {
             "Epic", "Steam", "Mac", "Microsoft", "Itch", "iOS",
             "Android", "Switch", "Xbox", "PlayStation", "Starlight"
         };
-
         public static Platforms[] platformValues = {
-            (Platforms)1,
-            (Platforms)2,
-            (Platforms)3,
-            (Platforms)4,
-            (Platforms)5,
-            (Platforms)6,
-            (Platforms)7,
-            (Platforms)8,
-            (Platforms)9,
-            (Platforms)10,
-            (Platforms)112
+            (Platforms)1,   (Platforms)2,   (Platforms)3,   (Platforms)4,   (Platforms)5,   (Platforms)6,
+            (Platforms)7,   (Platforms)8,   (Platforms)9,   (Platforms)10,  (Platforms)112
         };
-
         public static bool unlockFeatures = true;
-
-
-
         public class NjordNotification
         {
             public string title;
@@ -1044,7 +1410,6 @@ namespace NjordMenu
             public float ttl;
             public float lifetime;
             public bool HasExpired => lifetime > ttl;
-
             public NjordNotification(string title, string message, float ttl)
             {
                 this.title = title;
@@ -1059,7 +1424,6 @@ namespace NjordMenu
         public static bool autoBanEnabled = true;
         public static string banInput = "";
         public static bool isEditingBan = false;
-
         public static void LoadBanList()
         {
             try
@@ -1073,16 +1437,13 @@ namespace NjordMenu
             }
             catch { }
         }
-
         public static void AddToBanList(string friendCode, string puid, string name, string reason)
         {
             try
             {
                 if (string.IsNullOrEmpty(friendCode)) return;
-
                 bool alreadyBanned = false;
                 string fcLower = friendCode.Trim().ToLower();
-
                 foreach (var e in bannedEntries)
                 {
                     string[] parts = e.Split('|');
@@ -1092,7 +1453,6 @@ namespace NjordMenu
                         break;
                     }
                 }
-
                 if (!alreadyBanned)
                 {
                     string date = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
@@ -1103,7 +1463,6 @@ namespace NjordMenu
             }
             catch { }
         }
-
         public static void RemoveFromBanList(string entry)
         {
             try
@@ -1113,13 +1472,12 @@ namespace NjordMenu
             }
             catch { }
         }
-
         public static bool killReach = false, killAnyone = false;
         public static bool endlessSsDuration = false, noVitalsCooldown = false;
         public static bool endlessBattery = false, endlessVentTime = false, noVentCooldown = false;
         public static bool reactorSab = false, oxygenSab = false, commsSab = false, elecSab = false;
         public static bool autoOpenDoors = false;
-
+        public static bool moonWalk = false;
         public static bool SeePlayersInVent = false;
         public static bool seeGhosts = false;
         public static bool seeRoles = false;
@@ -1128,18 +1486,15 @@ namespace NjordMenu
         public static bool showTracers = false;
         public static bool fullBright = false;
         public static bool extendedLobby = false;
-        public static bool DarkModeEnabled = false;
+        public static bool DarkModeEnabled = true;
         public static float customLightRadius = 5f;
-
         public static bool alwaysChat = false;
         public static bool readGhostChat = false;
-
         public static bool neverEndGame = false;
         public static void ShowNotification(string text)
         {
             string title = "NjordMenu";
             string msg = text;
-
             if (text.Contains("[") && text.Contains("]"))
             {
                 int start = text.IndexOf("[");
@@ -1153,15 +1508,11 @@ namespace NjordMenu
             }
             SendNotification(title, msg.Trim(), 3.5f);
         }
-
         public static void SendNotification(string title, string message, float ttl = 3.5f)
         {
             if (!EnableCustomNotifs) return;
             screenNotifications.Add(new NjordNotification(title, message, ttl));
         }
-
-
-
         public static HashSet<byte> forcedImpostors = new HashSet<byte>();
         public static Dictionary<byte, RoleTypes> forcedPreGameRoles = new Dictionary<byte, RoleTypes>();
         public static bool enablePreGameRoleForce = false;
@@ -1172,13 +1523,9 @@ namespace NjordMenu
         public static bool LogAllRPCs = true;
         public static bool blockRainbowChat = true;
         public static bool blockFortegreenChat = true;
-
         public static bool EnableCustomNotifs = true;
         public static Vector2 notificationBoxSize = new Vector2(260f, 65f);
         public static List<NjordNotification> screenNotifications = new List<NjordNotification>();
-
-      
-      
         private bool stylesInited = false;
         private GUIStyle windowStyle, btnStyle, activeTabStyle, headerStyle, boxStyle;
         private GUIStyle sidebarStyle, sidebarBtnStyle, activeSidebarBtnStyle, titleStyle;
@@ -1200,78 +1547,49 @@ namespace NjordMenu
             }
             GUILayout.EndHorizontal();
             GUILayout.Space(8);
-
             if (currentHostOnlySubTab == 0) DrawLobbyControls();
             else if (currentHostOnlySubTab == 1) DrawPlayersRoles();
             else if (currentHostOnlySubTab == 2) DrawAntiCheatTab();
             else if (currentHostOnlySubTab == 3) DrawAutoHostTab();
         }
-        private void DrawAntiCheatTab()
+        private void DrawVisualsInGame()
         {
             GUILayout.BeginVertical(boxStyle);
-            GUILayout.Label("ANTI CHEAT", headerStyle);
-            GUILayout.Space(5);
-
-            enableLocalPetSpamDrop = DrawToggle(enableLocalPetSpamDrop, "Block Pet Spam (Local Drop)", 250);
-            GUILayout.Space(5);
-            enableHostPetSpamBan = DrawToggle(enableHostPetSpamBan, "Auto-Ban Pet Spammers (Host)", 250);
-            GUILayout.Space(15);
-
-            GUILayout.Label("BAN LIST", headerStyle);
-            autoBanEnabled = DrawToggle(autoBanEnabled, "Auto-Ban Blacklisted Players", 250);
-            GUILayout.Space(5);
-
+            GUILayout.Label(L("VISIBILITY", "ВИДИМОСТЬ"), headerStyle);
             GUILayout.BeginHorizontal();
-            string banDisp = isEditingBan ? banInput + "_" : (string.IsNullOrEmpty(banInput) ? "Enter Friend Code" : banInput);
-            if (GUILayout.Button(banDisp, isEditingBan ? activeTabStyle : inputBlockStyle, GUILayout.Width(200f), GUILayout.Height(25f)))
-            {
-                isEditingBan = !isEditingBan;
-                ResetAllBindWaits();
-            }
-            if (GUILayout.Button("ADD", btnStyle, GUILayout.Width(50f), GUILayout.Height(25f)))
-            {
-                if (!string.IsNullOrWhiteSpace(banInput))
-                {
-                    AddToBanList(banInput.Trim(), "Manual", "Unknown", "Manual ban");
-                    banInput = "";
-                    isEditingBan = false;
-                }
-            }
+            seeGhosts = DrawToggle(seeGhosts, L("See Ghosts", "Видеть призраков"), 210);
+            seeRoles = DrawToggle(seeRoles, L("See Roles", "Видеть роли"), 210);
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
-
-            banListScroll = GUILayout.BeginScrollView(banListScroll, GUILayout.Height(270));
-
-            if (bannedEntries.Count == 0)
-            {
-                GUILayout.Label("<color=#777777>Бан лист пуст.</color>", new GUIStyle(GUI.skin.label) { richText = true, alignment = TextAnchor.MiddleCenter });
-            }
-            else
-            {
-                for (int i = 0; i < bannedEntries.Count; i++)
-                {
-                    string entry = bannedEntries[i];
-                    if (string.IsNullOrWhiteSpace(entry)) continue;
-
-                    string[] parts = entry.Split('|');
-                    string disp = parts.Length >= 3 ? $"{parts[2]} ({parts[0]})" : entry;
-
-                    GUILayout.BeginHorizontal(boxStyle);
-                    GUILayout.Label(disp, new GUIStyle(GUI.skin.label) { fontSize = 12 }, GUILayout.Width(220));
-                    GUILayout.FlexibleSpace();
-
-                    GUIStyle redCrossStyle = new GUIStyle(btnStyle);
-                    redCrossStyle.normal.textColor = new Color(1f, 0.3f, 0.3f);
-
-                    if (GUILayout.Button("X", redCrossStyle, GUILayout.Width(25), GUILayout.Height(22)))
-                    {
-                        RemoveFromBanList(entry);
-                        break;
-                    }
-                    GUILayout.EndHorizontal();
-                }
-            }
-            GUILayout.EndScrollView();
+            GUILayout.BeginHorizontal();
+            showPlayerInfo = DrawToggle(showPlayerInfo, L("Show Player Info (ESP)", "Инфо об игроке (ESP)"), 210);
+            revealMeetingRoles = DrawToggle(revealMeetingRoles, L("Reveal Roles (Meeting)", "Показывать роли на собрании"), 210);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            removePenalty = DrawToggle(removePenalty, L("No Disconnect Penalty", "Нет штрафа за выход"), 210);
+            alwaysShowLobbyTimer = DrawToggle(alwaysShowLobbyTimer, L("Always Show Lobby Timer", "Всегда показывать таймер лобби"), 210);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            showTracers = DrawToggle(showTracers, L("Show Tracers", "Показывать линии (Tracer)"), 210);
+            fullBright = DrawToggle(fullBright, L("Full Bright (No Shadows)", "Полная яркость (Нет теней)"), 210);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            alwaysChat = DrawToggle(alwaysChat, L("Always Show Chat", "Всегда показывать чат"), 210);
+            readGhostChat = DrawToggle(readGhostChat, L("Read Ghost Chat", "Читать чат призраков"), 210);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            freecam = DrawToggle(freecam, L("Freecam (WASD)", "Свободная камера (WASD)"), 210);
+            cameraZoom = DrawToggle(cameraZoom, L("Camera Zoom (Scroll)", "Зум камеры (Колесико)"), 210);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            RevealVotesEnabled = DrawToggle(RevealVotesEnabled, L("Reveal Votes (Meeting)", "Показывать голоса (Собрание)"), 210);
+            SeePlayersInVent = DrawToggle(SeePlayersInVent, L("See Players In Vents", "Видеть игроков в люках"), 210);
+            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
         }
         public static bool enableLocalPetSpamDrop = true;
@@ -1280,76 +1598,55 @@ namespace NjordMenu
         public static class Shield_PetSpam_Patch
         {
             public static System.Collections.Generic.HashSet<byte> petSpamBlockedPlayers = new System.Collections.Generic.HashSet<byte>();
-
             public static System.Collections.Generic.Dictionary<byte, System.Collections.Generic.Queue<float>> petSpamTrackers = new System.Collections.Generic.Dictionary<byte, System.Collections.Generic.Queue<float>>();
-
             public static bool Prefix(PlayerPhysics __instance, byte callId, Hazel.MessageReader reader)
             {
                 if (!NjordMenuGUI.enableLocalPetSpamDrop && !NjordMenuGUI.enableHostPetSpamBan) return true;
-
                 if (callId == 49 || callId == 50)
                 {
                     try
                     {
                         if (__instance == null || __instance.myPlayer == null) return true;
-
                         if (__instance.myPlayer == PlayerControl.LocalPlayer) return true;
-
                         byte pId = __instance.myPlayer.PlayerId;
-
                         if (petSpamBlockedPlayers.Contains(pId))
                         {
                             if (NjordMenuGUI.enableLocalPetSpamDrop) return false;
                         }
-
                         float now = UnityEngine.Time.time;
-
                         if (!petSpamTrackers.ContainsKey(pId))
                             petSpamTrackers[pId] = new System.Collections.Generic.Queue<float>();
-
                         var q = petSpamTrackers[pId];
-
                         while (q.Count > 0 && q.Peek() < now - 0.75f)
                             q.Dequeue();
-
                         q.Enqueue(now);
-
                         if (q.Count > 160)
                         {
                             petSpamBlockedPlayers.Add(pId);
-
                             string pName = __instance.myPlayer.Data?.PlayerName ?? "Unknown";
-
                             if (NjordMenuGUI.enableLocalPetSpamDrop)
                             {
                                 NjordMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Игрок <b>{pName}</b> заблокирован за Pet Spam (Локально)!");
                             }
-
                             if (NjordMenuGUI.enableHostPetSpamBan && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                             {
                                 string fc = string.IsNullOrEmpty(__instance.myPlayer.Data?.FriendCode) ? "Unknown" : __instance.myPlayer.Data.FriendCode;
                                 string puid = "Unknown";
-
                                 try
                                 {
                                     var client = AmongUsClient.Instance.GetClientFromCharacter(__instance.myPlayer);
                                     if (client != null) puid = client.Id.ToString();
                                 }
                                 catch { }
-
                                 NjordMenuGUI.AddToBanList(fc, puid, pName, "Auto-banned for Pet Spam");
-
                                 AmongUsClient.Instance.KickPlayer(__instance.myPlayer.OwnerId, true);
-
                                 NjordMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Игрок <b>{pName}</b> АВТОМАТИЧЕСКИ ЗАБАНЕН за спам петом!");
                             }
-
                             return false;
                         }
                     }
                     catch { }
                 }
-
                 return true;
             }
         }
@@ -1363,20 +1660,14 @@ namespace NjordMenu
         private IEnumerator AttemptShapeshiftFrame(PlayerControl target, PlayerControl morphInto)
         {
             if (target == null || morphInto == null || PlayerControl.LocalPlayer == null || AmongUsClient.Instance == null) yield break;
-
             bool hasAnticheat = AmongUsClient.Instance.NetworkMode == NetworkModes.OnlineGame && !Constants.IsVersionModded();
-
             if (target.Data.RoleType != RoleTypes.Shapeshifter && hasAnticheat)
             {
                 RoleTypes currentRole = target.Data.RoleType;
                 target.RpcSetRole(RoleTypes.Shapeshifter, true);
-
                 yield return new WaitForSeconds(0.5f);
-
                 target.RpcShapeshift(morphInto, true);
-
                 yield return new WaitForSeconds(0.5f);
-
                 target.RpcSetRole(currentRole, true);
             }
             else
@@ -1385,36 +1676,28 @@ namespace NjordMenu
             }
             ShowNotification($"<color=#ca08ff>[MORPH]</color> <b>{target.Data.PlayerName}</b> превращен в <b>{morphInto.Data.PlayerName}</b>!");
         }
-
         private IEnumerator MassMorphCoroutine()
         {
             if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || PlayerControl.AllPlayerControls == null) yield break;
-
             bool hasAnticheat = AmongUsClient.Instance.NetworkMode == NetworkModes.OnlineGame && !Constants.IsVersionModded();
-
             Dictionary<byte, RoleTypes> originalRoles = new Dictionary<byte, RoleTypes>();
-
             foreach (var pc in PlayerControl.AllPlayerControls)
             {
                 if (pc != null && pc.Data != null && !pc.Data.Disconnected)
                 {
                     originalRoles[pc.PlayerId] = pc.Data.RoleType;
-
                     if (hasAnticheat && pc.Data.RoleType != RoleTypes.Shapeshifter)
                     {
                         pc.RpcSetRole(RoleTypes.Shapeshifter, true);
                     }
                 }
             }
-
             if (hasAnticheat) yield return new UnityEngine.WaitForSeconds(0.5f);
-
             PlayerControl targetToMorphInto = null;
             if (selectedMorphTargetId != 255)
             {
                 targetToMorphInto = GameData.Instance.GetPlayerById(selectedMorphTargetId)?.Object;
             }
-
             foreach (var pc in PlayerControl.AllPlayerControls)
             {
                 if (pc != null && pc.Data != null && !pc.Data.Disconnected)
@@ -1423,10 +1706,7 @@ namespace NjordMenu
                     pc.RpcShapeshift(morphTarget, true);
                 }
             }
-
-           
             if (hasAnticheat) yield return new UnityEngine.WaitForSeconds(0.5f);
-          
             foreach (var pc in PlayerControl.AllPlayerControls)
             {
                 if (pc != null && pc.Data != null && !pc.Data.Disconnected)
@@ -1437,17 +1717,13 @@ namespace NjordMenu
                     }
                 }
             }
-
             string notifText = targetToMorphInto != null ? targetToMorphInto.Data.PlayerName : "Egg";
             ShowNotification($"<color=#FF00FF>[MASS MORPH]</color> {notifText}");
         }
-
-
         private void ForceMeetingAsPlayer(PlayerControl target)
         {
             if (target == null || AmongUsClient.Instance == null) return;
             if (!AmongUsClient.Instance.AmHost) return;
-
             try
             {
                 MeetingRoomManager.Instance.AssignSelf(target, null);
@@ -1456,7 +1732,6 @@ namespace NjordMenu
             }
             catch { }
         }
-
         private void KillAll()
         {
             if (PlayerControl.LocalPlayer == null || PlayerControl.AllPlayerControls == null) return;
@@ -1472,7 +1747,6 @@ namespace NjordMenu
             }
             PlayerControl.LocalPlayer.NetTransform.RpcSnapTo(op);
         }
-
         private void KickAll()
         {
             if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && PlayerControl.AllPlayerControls != null)
@@ -1482,7 +1756,6 @@ namespace NjordMenu
                         AmongUsClient.Instance.KickPlayer((int)pc.OwnerId, false);
             }
         }
-
         private void DespawnLobby()
         {
             try
@@ -1494,7 +1767,6 @@ namespace NjordMenu
             }
             catch { }
         }
-
         private void SpawnLobby()
         {
             try
@@ -1507,9 +1779,6 @@ namespace NjordMenu
             }
             catch { }
         }
-
-
-
         public static void UnlockCosmetics()
         {
             if (HatManager.Instance == null) return;
@@ -1523,7 +1792,6 @@ namespace NjordMenu
             }
             catch { }
         }
-
         public static void ChangeNameGlobalHost(PlayerControl target, string newName)
         {
             if (target == null) return;
@@ -1536,9 +1804,7 @@ namespace NjordMenu
             }
             catch { }
         }
-
         public static bool showWatermark = true;
-
         private void SaveConfig()
         {
             try
@@ -1563,16 +1829,60 @@ namespace NjordMenu
                 PlayerPrefs.SetInt("M_BndEndImp", (int)bindEndImp);
                 PlayerPrefs.SetInt("M_BndEndImpDC", (int)bindEndImpDC);
                 PlayerPrefs.SetInt("M_BndEndHnsDC", (int)bindEndHnsDC);
-
+                PlayerPrefs.SetInt("M_AutoKickBugs", autoKickBugs ? 1 : 0);
+                PlayerPrefs.SetFloat("M_AutoKickTimer", autoKickTimer);
+                PlayerPrefs.SetInt("M_DisableVoteKicks", disableVoteKicks ? 1 : 0);
                 if (keyBinds.ContainsKey("Toggle Menu"))
                     Plugin.MenuKeybind.Value = keyBinds["Toggle Menu"];
-
                 Plugin.MenuConfig.Save();
-
                 PlayerPrefs.SetString("M_SpoofName", customNameInput);
                 PlayerPrefs.Save();
             }
             catch { }
+        }
+        private void DrawAutoHostTab()
+        {
+            GUILayout.BeginVertical(boxStyle);
+            GUILayout.Label(L("AUTO HOST SYSTEM", "СИСТЕМА АВТО-ХОСТА"), headerStyle);
+            var snapshot = NjordAutoHostService.GetStatusSnapshot();
+            GUILayout.Label($"<color=#aaaaaa>{L("Status:", "Статус:")}</color> <color=#FFAC1C>{snapshot.State}</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13 });
+            GUILayout.Space(10);
+            AutoHostEnabled = DrawToggle(AutoHostEnabled, L("Enable Auto Host", "Включить Авто-Хост"), 250);
+            GUILayout.Space(5);
+            AutoReturnLobbyAfterMatch = DrawToggle(AutoReturnLobbyAfterMatch, L("Auto Return To Lobby", "Авто-возврат в лобби"), 250);
+            GUILayout.Space(5);
+            AutoHostNotifications = DrawToggle(AutoHostNotifications, L("Show Notifications", "Показывать уведомления"), 250);
+            GUILayout.Space(5);
+            AutoHostWaitLoadedPlayers = DrawToggle(AutoHostWaitLoadedPlayers, L("Wait For Players To Load", "Ждать прогрузки игроков"), 250);
+            GUILayout.Space(5);
+            AutoHostCancelBelowMin = DrawToggle(AutoHostCancelBelowMin, L("Cancel Countdown If Player Leaves", "Отмена отсчета, если игрок вышел"), 250);
+            GUILayout.Space(5);
+            AutoHostInstantStart = DrawToggle(AutoHostInstantStart, L("Instant Start (No 5s Wait)", "Мгновенный старт (Без 5с)"), 250);
+            GUILayout.Space(5);
+            AutoHostForceLastMinute = DrawToggle(AutoHostForceLastMinute, L("Force Start Last Minute", "Форс-старт на последней минуте"), 250);
+            GUILayout.Space(15);
+            string hexColor = ColorUtility.ToHtmlStringRGB(currentAccentColor);
+            GUIStyle sliderLabelStyle = new GUIStyle(toggleLabelStyle) { richText = true };
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{L("Min Players:", "Мин. игроков:")} <color=#{hexColor}>{AutoHostMinPlayers}</color>", sliderLabelStyle, GUILayout.Width(175));
+            AutoHostMinPlayers = (int)GUILayout.HorizontalSlider(AutoHostMinPlayers, 1f, 15f, sliderStyle, sliderThumbStyle, GUILayout.Width(335));
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{L("Start Delay:", "Задержка старта:")} <color=#{hexColor}>{Mathf.Round(AutoHostStartDelaySeconds)}s</color>", sliderLabelStyle, GUILayout.Width(175));
+            AutoHostStartDelaySeconds = GUILayout.HorizontalSlider(AutoHostStartDelaySeconds, 0f, 180f, sliderStyle, sliderThumbStyle, GUILayout.Width(335));
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{L("Fast Start Players:", "Игроков для фаст-старта:")} <color=#{hexColor}>{AutoHostFastStartPlayers}</color>", sliderLabelStyle, GUILayout.Width(175));
+            AutoHostFastStartPlayers = (int)GUILayout.HorizontalSlider(AutoHostFastStartPlayers, 0f, 15f, sliderStyle, sliderThumbStyle, GUILayout.Width(335));
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{L("Fast Start Delay:", "Задержка фаст-старта:")} <color=#{hexColor}>{Mathf.Round(AutoHostFastStartDelaySeconds)}s</color>", sliderLabelStyle, GUILayout.Width(175));
+            AutoHostFastStartDelaySeconds = GUILayout.HorizontalSlider(AutoHostFastStartDelaySeconds, 0f, 60f, sliderStyle, sliderThumbStyle, GUILayout.Width(335));
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
         }
         private void LoadConfig()
         {
@@ -1587,6 +1897,9 @@ namespace NjordMenu
                 rpcSpoofDelay = Plugin.RpcSpoofDelayConfig.Value;
                 currentMenuColorIndex = Plugin.MenuColorIndexConfig.Value;
                 rgbMenuMode = Plugin.RgbMenuModeConfig.Value;
+                if (PlayerPrefs.HasKey("M_AutoKickBugs")) autoKickBugs = PlayerPrefs.GetInt("M_AutoKickBugs") == 1;
+                if (PlayerPrefs.HasKey("M_AutoKickTimer")) autoKickTimer = PlayerPrefs.GetFloat("M_AutoKickTimer");
+                if (PlayerPrefs.HasKey("M_DisableVoteKicks")) disableVoteKicks = PlayerPrefs.GetInt("M_DisableVoteKicks") == 1;
                 if (PlayerPrefs.HasKey("M_BndMagnet")) bindMagnetCursor = (KeyCode)PlayerPrefs.GetInt("M_BndMagnet");
                 if (PlayerPrefs.HasKey("M_MenuToggleKey")) menuToggleKey = (KeyCode)PlayerPrefs.GetInt("M_MenuToggleKey");
                 if (PlayerPrefs.HasKey("M_BndMMorph")) bindMassMorph = (KeyCode)PlayerPrefs.GetInt("M_BndMMorph");
@@ -1598,12 +1911,10 @@ namespace NjordMenu
                 if (PlayerPrefs.HasKey("M_BndEndImp")) bindEndImp = (KeyCode)PlayerPrefs.GetInt("M_BndEndImp");
                 if (PlayerPrefs.HasKey("M_BndEndImpDC")) bindEndImpDC = (KeyCode)PlayerPrefs.GetInt("M_BndEndImpDC");
                 if (PlayerPrefs.HasKey("M_BndEndHnsDC")) bindEndHnsDC = (KeyCode)PlayerPrefs.GetInt("M_BndEndHnsDC");
-
                 if (!rgbMenuMode && currentMenuColorIndex >= 0 && currentMenuColorIndex < menuColors.Length)
                 {
                     currentAccentColor = menuColors[currentMenuColorIndex];
                 }
-
                 keyBinds["Toggle Menu"] = Plugin.MenuKeybind.Value;
                 if (PlayerPrefs.HasKey("M_SpoofName")) customNameInput = PlayerPrefs.GetString("M_SpoofName");
             }
@@ -1631,12 +1942,10 @@ namespace NjordMenu
             result.SetPixels(pix); result.Apply();
             return result;
         }
-
         private RectOffset CreateRectOffset(int left, int right, int top, int bottom)
         {
             return new RectOffset { left = left, right = right, top = top, bottom = bottom };
         }
-
         private void UpdateSwitchTex(Texture2D tex, bool isOn, Color accentColor)
         {
             int width = tex.width; int height = tex.height;
@@ -1672,7 +1981,6 @@ namespace NjordMenu
             }
             tex.SetPixels(pixels); tex.Apply();
         }
-
         private void UpdateAccentColor(Color color)
         {
             currentAccentColor = color;
@@ -1745,7 +2053,6 @@ namespace NjordMenu
             if (btnStyle != null) btnStyle.active.background = texAccent;
             if (inputBlockStyle != null) inputBlockStyle.normal.textColor = color;
         }
-
         private void InitStyles()
         {
             Color accent = currentAccentColor;
@@ -1754,7 +2061,6 @@ namespace NjordMenu
             Color boxBg = new Color(0f, 0f, 0f, 0f);
             Color btnCol = new Color(0.23f, 0.23f, 0.23f, 1f);
             Color sliderBgCol = new Color(0.08f, 0.08f, 0.08f, 1f);
-
             texWindowBg = MakeRoundedTex(64, darkBg, 12f);
             texSidebarBg = MakeRoundedTex(64, sidebarBg, 0f);
             texBoxBg = MakeRoundedTex(64, boxBg, 0f);
@@ -1764,17 +2070,14 @@ namespace NjordMenu
             texSliderThumb = MakeRoundedTex(20, accent, 10f);
             texInputBg = MakeRoundedTex(64, new Color(0.08f, 0.08f, 0.08f, 0.85f), 6f);
             texColorBtn = MakeRoundedTex(64, Color.white, 12f);
-
             texToggleOff = new Texture2D(30, 16, TextureFormat.RGBA32, false);
             texToggleOff.hideFlags = HideFlags.HideAndDontSave;
             texToggleOn = new Texture2D(30, 16, TextureFormat.RGBA32, false);
             texToggleOn.hideFlags = HideFlags.HideAndDontSave;
             UpdateSwitchTex(texToggleOff, false, Color.white);
             UpdateSwitchTex(texToggleOn, true, accent);
-
             safeLineStyle = new GUIStyle();
             safeLineStyle.normal.background = Texture2D.whiteTexture;
-
             windowStyle = new GUIStyle();
             windowStyle.normal.background = texWindowBg;
             windowStyle.normal.textColor = accent;
@@ -1782,12 +2085,10 @@ namespace NjordMenu
             windowStyle.fontSize = 14;
             windowStyle.padding = CreateRectOffset(0, 0, 0, 0);
             windowStyle.border = CreateRectOffset(12, 12, 12, 12);
-
             boxStyle = new GUIStyle();
             boxStyle.normal.background = texBoxBg;
             boxStyle.padding = CreateRectOffset(0, 0, 0, 0);
             boxStyle.margin = CreateRectOffset(0, 0, 4, 8);
-
             btnStyle = new GUIStyle(GUI.skin.button);
             btnStyle.normal.background = texBtnBg;
             btnStyle.normal.textColor = new Color(0.78f, 0.78f, 0.78f);
@@ -1797,16 +2098,13 @@ namespace NjordMenu
             btnStyle.border = CreateRectOffset(6, 6, 6, 6);
             btnStyle.fontSize = 12;
             btnStyle.fontStyle = FontStyle.Bold;
-
             activeTabStyle = new GUIStyle(btnStyle);
             activeTabStyle.normal.background = texAccent;
             activeTabStyle.normal.textColor = Color.black;
-
             subTabStyle = new GUIStyle(btnStyle);
             subTabStyle.padding = CreateRectOffset(6, 6, 2, 2);
             activeSubTabStyle = new GUIStyle(activeTabStyle);
             activeSubTabStyle.padding = CreateRectOffset(6, 6, 2, 2);
-
             inputBlockStyle = new GUIStyle(btnStyle);
             inputBlockStyle.normal.background = texInputBg;
             inputBlockStyle.hover.background = texInputBg;
@@ -1814,7 +2112,6 @@ namespace NjordMenu
             inputBlockStyle.normal.textColor = accent;
             inputBlockStyle.alignment = TextAnchor.MiddleCenter;
             inputBlockStyle.fontStyle = FontStyle.Bold;
-
             headerStyle = new GUIStyle();
             headerStyle.normal.background = texBtnBg;
             headerStyle.normal.textColor = accent;
@@ -1823,11 +2120,9 @@ namespace NjordMenu
             headerStyle.padding = CreateRectOffset(6, 6, 4, 4);
             headerStyle.margin = CreateRectOffset(0, 0, 4, 4);
             headerStyle.fontSize = 13;
-
             sidebarStyle = new GUIStyle();
             sidebarStyle.normal.background = texSidebarBg;
             sidebarStyle.padding = CreateRectOffset(0, 0, 5, 0);
-
             sidebarBtnStyle = new GUIStyle();
             sidebarBtnStyle.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
             sidebarBtnStyle.hover.textColor = Color.white;
@@ -1835,65 +2130,53 @@ namespace NjordMenu
             sidebarBtnStyle.alignment = TextAnchor.MiddleLeft;
             sidebarBtnStyle.fontSize = 13;
             sidebarBtnStyle.fontStyle = FontStyle.Bold;
-
             activeSidebarBtnStyle = new GUIStyle(sidebarBtnStyle);
             activeSidebarBtnStyle.normal.textColor = accent;
             activeSidebarBtnStyle.hover.textColor = accent;
-
             toggleOffStyle = new GUIStyle();
             toggleOffStyle.normal.background = texToggleOff;
             toggleOnStyle = new GUIStyle();
             toggleOnStyle.normal.background = texToggleOn;
-
             toggleLabelStyle = new GUIStyle();
             toggleLabelStyle.normal.textColor = new Color(0.78f, 0.78f, 0.78f);
             toggleLabelStyle.alignment = TextAnchor.MiddleLeft;
             toggleLabelStyle.padding = CreateRectOffset(4, 0, 0, 0);
             toggleLabelStyle.fontSize = 12;
             toggleLabelStyle.fontStyle = FontStyle.Bold;
-
             sliderStyle = new GUIStyle();
             sliderStyle.normal.background = texSliderBg;
             sliderStyle.border = CreateRectOffset(6, 6, 6, 6);
             sliderStyle.fixedHeight = 10f;
             sliderStyle.margin = CreateRectOffset(0, 0, 8, 8);
-
             sliderThumbStyle = new GUIStyle();
             sliderThumbStyle.normal.background = texSliderThumb;
             sliderThumbStyle.fixedWidth = 18f;
             sliderThumbStyle.fixedHeight = 18f;
             sliderThumbStyle.margin = CreateRectOffset(0, 0, -4, 0);
-
             titleStyle = new GUIStyle();
             titleStyle.normal.textColor = accent;
             titleStyle.fontStyle = FontStyle.Bold;
             titleStyle.fontSize = 14;
             titleStyle.padding = CreateRectOffset(10, 0, 8, 0);
-
             Texture2D texScrollBg = MakeRoundedTex(8, new Color(0.1f, 0.1f, 0.1f, 0.2f), 4f);
-            texScrollThumb = MakeRoundedTex(8, accent, 4f); 
-
+            texScrollThumb = MakeRoundedTex(8, accent, 4f);
             GUIStyle scrollBarStyle = new GUIStyle(GUI.skin.verticalScrollbar);
             scrollBarStyle.normal.background = texScrollBg;
             scrollBarStyle.fixedWidth = 8f;
             scrollBarStyle.border = CreateRectOffset(0, 0, 4, 4);
             scrollBarStyle.margin = CreateRectOffset(2, 2, 2, 2);
-
             GUIStyle scrollBarThumbStyle = new GUIStyle(GUI.skin.verticalScrollbarThumb);
             scrollBarThumbStyle.normal.background = texScrollThumb;
             scrollBarThumbStyle.hover.background = texScrollThumb;
             scrollBarThumbStyle.active.background = texScrollThumb;
             scrollBarThumbStyle.fixedWidth = 8f;
             scrollBarThumbStyle.border = CreateRectOffset(0, 0, 4, 4);
-
             GUI.skin.verticalScrollbar = scrollBarStyle;
             GUI.skin.verticalScrollbarThumb = scrollBarThumbStyle;
             GUI.skin.horizontalScrollbar.normal.background = null;
             GUI.skin.horizontalScrollbarThumb.normal.background = null;
-
             stylesInited = true;
         }
-
         private void LoadBackgroundImage()
         {
             try
@@ -1937,7 +2220,6 @@ namespace NjordMenu
             }
             catch { enableBackground = false; }
         }
-
         public static string ApplyMenuShimmer(string text)
         {
             string result = "";
@@ -1951,22 +2233,15 @@ namespace NjordMenu
             }
             return result;
         }
-
         private bool DrawToggle(bool value, string text, int width = 0)
         {
             GUILayout.BeginHorizontal(GUILayout.Width(width > 0 ? width : 200));
-
             bool clickedBox = GUILayout.Button("", value ? toggleOnStyle : toggleOffStyle, GUILayout.Width(30), GUILayout.Height(16));
-
             GUILayout.Space(6);
-
             bool clickedText = GUILayout.Button(text, toggleLabelStyle);
-
             GUILayout.EndHorizontal();
-
             return (clickedBox || clickedText) ? !value : value;
         }
-
         private bool DrawBindableButton(string label, string bindKey, float width)
         {
             bool clicked = false;
@@ -1979,7 +2254,6 @@ namespace NjordMenu
             GUILayout.EndVertical();
             return clicked;
         }
-
         private bool DrawHostToggle(bool value, string text, float totalWidth = 250f)
         {
             GUILayout.BeginHorizontal(GUILayout.Width(totalWidth), GUILayout.Height(20));
@@ -1996,7 +2270,6 @@ namespace NjordMenu
             {
                 GUILayout.Label("⌨️ CUSTOM KEYBINDS", headerStyle);
                 GUILayout.Space(10);
-
                 DrawKeybindRow("Magnet Cursor:", ref bindMagnetCursor, ref isWaitBindMagnetCursor);
                 DrawKeybindRow("Menu Toggle Key:", ref menuToggleKey, ref isWaitingForBind);
                 DrawKeybindRow("Mass Morph:", ref bindMassMorph, ref isWaitBindMassMorph);
@@ -2011,33 +2284,32 @@ namespace NjordMenu
             }
             finally { GUILayout.EndVertical(); }
         }
-
         private void DrawKeybindRow(string label, ref KeyCode currentKey, ref bool isWaiting)
         {
             GUILayout.BeginHorizontal();
             GUILayout.Space(10);
             GUIStyle alignedLabel = new GUIStyle(toggleLabelStyle) { alignment = TextAnchor.MiddleLeft, margin = CreateRectOffset(0, 0, 4, 0) };
             GUILayout.Label(label, alignedLabel, GUILayout.Width(220), GUILayout.Height(25));
-
             string bindText = isWaiting ? "Press any key..." : (currentKey == KeyCode.None ? "NONE" : currentKey.ToString());
             if (GUILayout.Button(bindText, isWaiting ? activeTabStyle : btnStyle, GUILayout.Width(120), GUILayout.Height(25)))
             {
                 ResetAllBindWaits();
                 isWaiting = true;
             }
-
             if (GUILayout.Button("Clear", btnStyle, GUILayout.Width(50), GUILayout.Height(25)))
             {
                 currentKey = KeyCode.None;
                 isWaiting = false;
                 SaveConfig();
             }
-
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
         }
-
+        public static bool AnimShieldsEnabled = false;
+        public static bool AnimAsteroidsEnabled = false;
+        public static bool AnimCamsInUseEnabled = false;
+        public static bool IsScanning = false;
         private void ResetAllBindWaits()
         {
             isWaitingForBind = false;
@@ -2065,22 +2337,17 @@ namespace NjordMenu
             }
             GUILayout.EndHorizontal();
             GUILayout.Space(10);
-
             if (currentGeneralSubTab == 0) DrawGeneralInfoTab();
             else if (currentGeneralSubTab == 1) DrawBindsTab();
         }
-
         private void DrawGeneralInfoTab()
         {
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("INFORMATION & HOTKEYS", headerStyle);
             GUILayout.Space(10);
-
             GUIStyle textStyle = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 12 };
-
-            string title = ApplyMenuShimmer("Welcome to NjordMenu v1.2.3!");
+            string title = ApplyMenuShimmer("Welcome to NjordMenu v1.2.4!");
             string subtitle = "<color=#aaaaaa><b>(The start timer editing was patched by innersloth)</b></color>";
-
             string infoText = $"<size=16><b>{title}</b></size>\n{subtitle}\n\n" +
                  $"<b><color=#FFAC1C>📌 HOTKEYS:</color></b>\n" +
                  $"• <b>[Insert]</b> or <b>[Right Shift]</b> — Open / Close Menu\n" +
@@ -2092,31 +2359,69 @@ namespace NjordMenu
                  $"<color=#FF5555>If you fail to follow this suggestion, do not expect to receive any kind of support. Your account may be sanctioned or banned by Innersloth, resulting in the loss of your friends list, unlocked cosmetics, and purchases.</color>\n\n" +
                  $"<b><color=#00FF00>Have a great game and enjoy the mod♡! 🎮✨</color></b>\n\n" +
                  $"<size=10><color=#777777>This mod is not affiliated with Among Us or Innersloth LLC, and the content contained therein is not endorsed or otherwise sponsored by Innersloth LLC. Portions of the materials contained herein are property of Innersloth LLC. © Innersloth LLC.</color></size>";
-
             GUILayout.Label(infoText, textStyle);
             GUILayout.FlexibleSpace();
             GUILayout.EndVertical();
         }
-
+        [HarmonyPatch(typeof(ChatController), nameof(ChatController.AddChat))]
+        public static class ChatLogger_Patch
+        {
+            public static void Prefix(PlayerControl sourcePlayer, ref string chatText)
+            {
+                if (!NjordMenuGUI.enableChatLog || string.IsNullOrWhiteSpace(chatText)) return;
+                try
+                {
+                    string time = System.DateTime.Now.ToString("HH:mm:ss");
+                    string name = "System/Unknown";
+                    string levelStr = "?";
+                    string fc = "Hidden";
+                    string puid = "Unknown";
+                    string platformStr = "Unknown";
+                    if (sourcePlayer != null && sourcePlayer.Data != null)
+                    {
+                        name = sourcePlayer.Data.PlayerName;
+                        uint rawLevel = sourcePlayer.Data.PlayerLevel;
+                        if (rawLevel != uint.MaxValue && rawLevel < 10000) levelStr = (rawLevel + 1).ToString();
+                        if (!string.IsNullOrEmpty(sourcePlayer.Data.FriendCode)) fc = sourcePlayer.Data.FriendCode;
+                        var client = AmongUsClient.Instance?.GetClientFromCharacter(sourcePlayer);
+                        if (client != null)
+                        {
+                            puid = client.Id.ToString();
+                            platformStr = NjordMenuGUI.GetPlatform(client);
+                        }
+                    }
+                    string cleanText = System.Text.RegularExpressions.Regex.Replace(chatText, "<.*?>", string.Empty);
+                    string logLine = $"[{time}] [{name}] [Lv:{levelStr}] [FC:{fc}] [ID:{puid}] [{platformStr}] : {cleanText}\n";
+                    string chatLogPath = System.IO.Path.Combine(Plugin.NjordFolder, "ChatLog.txt");
+                    System.IO.File.AppendAllText(chatLogPath, logLine);
+                }
+                catch { }
+            }
+        }
         private void DrawSelfTab()
         {
             GUILayout.BeginHorizontal();
             for (int i = 0; i < selfSubTabs.Length; i++)
+            {
                 if (GUILayout.Button(selfSubTabs[i], currentSelfSubTab == i ? activeSubTabStyle : subTabStyle, GUILayout.Height(18)))
-                { currentSelfSubTab = i; scrollPosition = Vector2.zero; }
+                {
+                    currentSelfSubTab = i;
+                    scrollPosition = Vector2.zero;
+                }
+            }
             GUILayout.EndHorizontal();
             GUILayout.Space(8);
             if (currentSelfSubTab == 0) DrawSelfSpoof();
             else if (currentSelfSubTab == 1) DrawPlayerMovement();
+            else if (currentSelfSubTab == 2) DrawRolesTab();
+            else if (currentSelfSubTab == 3) DrawChatSettingsTab();
         }
-
         private void DrawPlayerMovement()
         {
             GUILayout.BeginVertical(boxStyle);
             try
             {
                 GUILayout.Label("MOVEMENT & TELEPORT", headerStyle);
-
                 GUILayout.BeginHorizontal();
                 try
                 {
@@ -2126,9 +2431,7 @@ namespace NjordMenu
                     if (GUILayout.Button("Reset", btnStyle, GUILayout.Width(50), GUILayout.Height(20))) engineSpeed = 1f;
                 }
                 finally { GUILayout.EndHorizontal(); }
-
                 GUILayout.Space(5);
-
                 GUILayout.BeginHorizontal();
                 try
                 {
@@ -2138,9 +2441,7 @@ namespace NjordMenu
                     if (GUILayout.Button("Reset", btnStyle, GUILayout.Width(50), GUILayout.Height(20))) walkSpeed = 1f;
                 }
                 finally { GUILayout.EndHorizontal(); }
-
                 GUILayout.Space(5);
-
                 GUILayout.BeginHorizontal();
                 try
                 {
@@ -2149,9 +2450,7 @@ namespace NjordMenu
                     GUILayout.FlexibleSpace();
                 }
                 finally { GUILayout.EndHorizontal(); }
-
                 GUILayout.Space(5);
-
                 GUILayout.BeginHorizontal();
                 try
                 {
@@ -2166,10 +2465,8 @@ namespace NjordMenu
         private void SmartEndGame(string outcome)
         {
             if (GameManager.Instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
-
             bool isHns = GameManager.Instance.IsHideAndSeek();
             int reasonCode = 0;
-
             switch (outcome)
             {
                 case "CrewWin": reasonCode = isHns ? 7 : 0; break;
@@ -2177,7 +2474,6 @@ namespace NjordMenu
                 case "ImpDisconnect":
                 case "HnsImpDisconnect": reasonCode = 5; break;
             }
-
             bool tempBlock = neverEndGame;
             neverEndGame = false;
             GameManager.Instance.RpcEndGame((GameOverReason)reasonCode, false);
@@ -2189,7 +2485,6 @@ namespace NjordMenu
             GUIStyle greenHeader = new GUIStyle(headerStyle);
             greenHeader.normal.textColor = currentAccentColor;
             GUILayout.Label("ACCOUNT SPOOFER", greenHeader);
-
             GUILayout.BeginHorizontal();
             GUILayout.Label("Fake Level", btnStyle, GUILayout.Width(120), GUILayout.Height(28));
             string lvlDisp = isEditingLevel ? spoofLevelString + "_" : spoofLevelString;
@@ -2206,7 +2501,6 @@ namespace NjordMenu
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
             GUILayout.Space(2);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Name", btnStyle, GUILayout.Width(120), GUILayout.Height(28));
@@ -2221,7 +2515,6 @@ namespace NjordMenu
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
             GUILayout.Space(5);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Spoof Platform", enablePlatformSpoof ? activeTabStyle : btnStyle, GUILayout.Width(120), GUILayout.Height(28)))
@@ -2231,13 +2524,10 @@ namespace NjordMenu
             }
             GUILayout.Space(10);
             string hexColor = ColorUtility.ToHtmlStringRGB(currentAccentColor);
-
             GUILayout.Label($"Platform: <color=#{hexColor}>{platformNames[currentPlatformIndex]}</color>", new GUIStyle(toggleLabelStyle) { fontSize = 13, richText = true }, GUILayout.Height(28));
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
             GUILayout.Space(5);
-
             GUILayout.BeginHorizontal();
             int newPlatIdx = (int)GUILayout.HorizontalSlider(currentPlatformIndex, 0, platformNames.Length - 1, sliderStyle, sliderThumbStyle, GUILayout.Width(290));
             if (newPlatIdx != currentPlatformIndex)
@@ -2247,7 +2537,6 @@ namespace NjordMenu
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
             GUILayout.Space(15);
             GUILayout.Label("TASKS", headerStyle);
             if (GUILayout.Button("Complete My Tasks", btnStyle, GUILayout.Height(30)))
@@ -2258,7 +2547,6 @@ namespace NjordMenu
             }
             GUILayout.EndVertical();
         }
-
         private void DrawVisualsTab()
         {
             GUILayout.BeginHorizontal();
@@ -2269,50 +2557,35 @@ namespace NjordMenu
             GUILayout.Space(8);
             if (currentVisualsSubTab == 0) DrawVisualsInGame();
         }
-
-        private void DrawVisualsInGame()
+        [HarmonyPatch(typeof(PlayerBanData), nameof(PlayerBanData.BanPoints), MethodType.Setter)]
+        public static class RemoveDisconnectPenalty_Patch
         {
-            GUILayout.BeginVertical(boxStyle);
-            GUILayout.Label("VISIBILITY", headerStyle);
-            GUILayout.BeginHorizontal();
-            seeGhosts = DrawToggle(seeGhosts, "See Ghosts", 210);
-            seeRoles = DrawToggle(seeRoles, "See Roles", 210);
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-            GUILayout.BeginHorizontal();
-            showPlayerInfo = DrawToggle(showPlayerInfo, "Show Player Info (ESP)", 210);
-            revealMeetingRoles = DrawToggle(revealMeetingRoles, "Reveal Roles (Meeting)", 210);
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-            GUILayout.BeginHorizontal();
-            showTracers = DrawToggle(showTracers, "Show Tracers", 210);
-            fullBright = DrawToggle(fullBright, "Full Bright (No Shadows)", 210);
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-            GUILayout.BeginHorizontal();
-            alwaysChat = DrawToggle(alwaysChat, "Always Show Chat", 210);
-            readGhostChat = DrawToggle(readGhostChat, "Read Ghost Chat", 210);
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-            GUILayout.BeginHorizontal();
-            freecam = DrawToggle(freecam, "Freecam (WASD)", 210);
-            cameraZoom = DrawToggle(cameraZoom, "Camera Zoom (Scroll)", 210);
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-            GUILayout.BeginHorizontal();
-            RevealVotesEnabled = DrawToggle(RevealVotesEnabled, "Reveal Votes (Meeting)", 210);
-            SeePlayersInVent = DrawToggle(SeePlayersInVent, "See Players In the Vents", 210);
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5);
-            GUILayout.Label("Light Radius", toggleLabelStyle);
-            customLightRadius = GUILayout.HorizontalSlider(customLightRadius, 0.5f, 20f, sliderStyle, sliderThumbStyle, GUILayout.Width(200));
-            GUILayout.EndVertical();
+            public static bool Prefix(PlayerBanData __instance, ref float value)
+            {
+                if (!NjordMenuGUI.removePenalty) return true;
+                if (AmongUsClient.Instance == null || AmongUsClient.Instance.NetworkMode != NetworkModes.OnlineGame)
+                    return true;
+                value = 0f;
+                return false;
+            }
         }
-
+        [HarmonyPatch(typeof(GameStartManager), nameof(GameStartManager.Start))]
+        public static class ShowLobbyTimer_Patch
+        {
+            public static void Postfix(GameStartManager __instance)
+            {
+                if (!NjordMenuGUI.alwaysShowLobbyTimer) return;
+                if (__instance == null || GameData.Instance == null || AmongUsClient.Instance == null) return;
+                if (AmongUsClient.Instance.NetworkMode == NetworkModes.LocalGame || !AmongUsClient.Instance.AmHost) return;
+                if (HudManager.Instance != null)
+                {
+                    HudManager.Instance.ShowLobbyTimer(600);
+                }
+            }
+        }
         private void DrawPlayersTab()
         {
             GUILayout.BeginHorizontal();
-
             GUILayout.BeginVertical(boxStyle, GUILayout.Width(200));
             playerListScrollPos = GUILayout.BeginScrollView(playerListScrollPos);
             if (lockedPlayersList.Count > 0)
@@ -2321,15 +2594,11 @@ namespace NjordMenu
                 {
                     if (pc == null || pc.Data == null || pc.PlayerId >= 100) continue;
                     string pName = pc.Data.PlayerName ?? "Unknown";
-
                     if (forcedPreGameRoles.ContainsKey(pc.PlayerId)) pName += " [*]";
                     else if (forcedImpostors.Contains(pc.PlayerId)) pName += " [Imp]";
-
                     bool isSelected = selectedHydraPlayerId == pc.PlayerId;
-
                     GUI.contentColor = Color.white;
                     try { GUI.contentColor = Palette.PlayerColors[pc.Data.DefaultOutfit.ColorId]; } catch { }
-
                     if (GUILayout.Button(pName, isSelected ? activeTabStyle : btnStyle, GUILayout.Height(30)))
                     {
                         selectedHydraPlayerId = pc.PlayerId;
@@ -2339,17 +2608,13 @@ namespace NjordMenu
             }
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
-
             GUILayout.BeginVertical(boxStyle, GUILayout.ExpandWidth(true));
             playerActionScrollPos = GUILayout.BeginScrollView(playerActionScrollPos);
-
             PlayerControl target = lockedPlayersList.FirstOrDefault(p => p.PlayerId == selectedHydraPlayerId);
-
             if (target != null && target.Data != null)
             {
                 GUILayout.Label($"<color=#aaaaaa>Selected:</color> {target.Data.PlayerName}", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 14 });
                 GUILayout.Space(10);
-
                 GUILayout.BeginHorizontal();
                 GUI.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 1f);
                 if (GUILayout.Button("KILL", btnStyle, GUILayout.Height(30)))
@@ -2361,10 +2626,8 @@ namespace NjordMenu
                     PlayerControl.LocalPlayer.NetTransform.RpcSnapTo(op);
                 }
                 GUI.backgroundColor = Color.white;
-
                 GUILayout.Space(5);
                 if (GUILayout.Button("Force Meeting", btnStyle, GUILayout.Height(30))) ForceMeetingAsPlayer(target);
-
                 GUILayout.Space(5);
                 bool hr = rainbowPlayers.Contains(target.PlayerId);
                 if (GUILayout.Button(hr ? "RGB: ON" : "RGB: OFF", hr ? activeTabStyle : btnStyle, GUILayout.Height(30)))
@@ -2373,33 +2636,26 @@ namespace NjordMenu
                     else rainbowPlayers.Remove(target.PlayerId);
                 }
                 GUILayout.EndHorizontal();
-
                 GUILayout.Space(15);
                 GUILayout.Label("<color=#aaaaaa>Morph Target:</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11 });
                 GUILayout.BeginHorizontal();
-
                 int mIdx = lockedPlayersList.FindIndex(p => p.PlayerId == selectedMorphTargetId);
-
                 GUI.backgroundColor = currentAccentColor;
                 if (GUILayout.Button("<", btnStyle, GUILayout.Width(25), GUILayout.Height(25)))
                 {
                     if (lockedPlayersList.Count > 0) { mIdx--; if (mIdx < 0) mIdx = lockedPlayersList.Count - 1; selectedMorphTargetId = lockedPlayersList[mIdx].PlayerId; }
                 }
                 GUI.backgroundColor = Color.white;
-
                 string morphName = "Target";
                 if (mIdx >= 0 && mIdx < lockedPlayersList.Count) morphName = lockedPlayersList[mIdx].Data.PlayerName;
                 if (morphName.Length > 10) morphName = morphName.Substring(0, 10) + "..";
-
                 GUIStyle morphLabelStyle = new GUIStyle(btnStyle);
                 morphLabelStyle.normal.background = null;
                 morphLabelStyle.hover.background = null;
                 morphLabelStyle.normal.textColor = currentAccentColor;
                 morphLabelStyle.fontStyle = FontStyle.Bold;
                 morphLabelStyle.alignment = TextAnchor.MiddleCenter;
-
                 GUILayout.Label(morphName, morphLabelStyle, GUILayout.Height(25), GUILayout.ExpandWidth(true));
-
                 GUI.backgroundColor = currentAccentColor;
                 if (GUILayout.Button(">", btnStyle, GUILayout.Width(25), GUILayout.Height(25)))
                 {
@@ -2409,7 +2665,6 @@ namespace NjordMenu
                 GUILayout.Space(5);
                 GUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
-
                 GUI.backgroundColor = currentAccentColor;
                 if (GUILayout.Button("MORPH TARGET", btnStyle, GUILayout.Width(160), GUILayout.Height(25)))
                 {
@@ -2417,34 +2672,26 @@ namespace NjordMenu
                     this.StartCoroutine(AttemptShapeshiftFrame(target, morphTarget).WrapToIl2Cpp());
                 }
                 GUI.backgroundColor = Color.white;
-
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
-
                 GUILayout.Space(15);
                 GUILayout.Label("SET PLAYER COLOR", headerStyle);
                 GUILayout.BeginVertical(boxStyle);
-
                 GUIStyle roundedColorBtnStyle = new GUIStyle();
                 roundedColorBtnStyle.normal.background = texColorBtn;
                 roundedColorBtnStyle.margin = CreateRectOffset(2, 2, 2, 2);
-
                 int colorsPerRow = 7;
                 for (int i = 0; i < Palette.PlayerColors.Length; i++)
                 {
                     if (i % colorsPerRow == 0) GUILayout.BeginHorizontal();
-
                     GUI.color = Palette.PlayerColors[i];
-
                     if (GUILayout.Button("", roundedColorBtnStyle, GUILayout.Width(32), GUILayout.Height(30)))
                         target.RpcSetColor((byte)i);
-
                     if (i % colorsPerRow == colorsPerRow - 1 || i == Palette.PlayerColors.Length - 1)
                         GUILayout.EndHorizontal();
                 }
                 GUI.color = Color.white;
                 GUILayout.EndVertical();
-
                 GUILayout.Space(15);
                 GUILayout.Label("PRE-GAME ROLE (HOST)", headerStyle);
                 GUILayout.BeginHorizontal();
@@ -2461,19 +2708,14 @@ namespace NjordMenu
                 GUILayout.Label("<color=#777777>Select a player...</color>", new GUIStyle(GUI.skin.label) { richText = true, alignment = TextAnchor.MiddleCenter });
                 GUILayout.FlexibleSpace();
             }
-
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
-
             GUILayout.EndHorizontal();
         }
-
         private void DrawRolesTab()
         {
             GUILayout.BeginHorizontal();
-
             GUILayout.BeginVertical(GUILayout.Width(280));
-
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("Roles", headerStyle);
             GUILayout.BeginHorizontal();
@@ -2486,7 +2728,6 @@ namespace NjordMenu
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
-
             GUILayout.Space(5);
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("Impostor", headerStyle);
@@ -2494,7 +2735,6 @@ namespace NjordMenu
             GUILayout.Space(5);
             killAnyone = DrawToggle(killAnyone, "Kill Anyone", 160);
             GUILayout.EndVertical();
-
             GUILayout.Space(5);
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("Shapeshifter", headerStyle);
@@ -2502,7 +2742,6 @@ namespace NjordMenu
             GUILayout.Space(5);
             endlessSsDuration = DrawToggle(endlessSsDuration, "Endless Ss Duration", 160);
             GUILayout.EndVertical();
-
             GUILayout.Space(5);
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("Tracker", headerStyle);
@@ -2510,20 +2749,15 @@ namespace NjordMenu
             GUILayout.Space(5);
             NoTrackingCooldown = DrawToggle(NoTrackingCooldown, "No Track Cooldown", 160);
             GUILayout.EndVertical();
-
             GUILayout.EndVertical();
-
             GUILayout.Space(10);
-
             GUILayout.BeginVertical(GUILayout.Width(280));
-
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("Engineer", headerStyle);
             endlessVentTime = DrawToggle(endlessVentTime, "Endless Vent Time", 160);
             GUILayout.Space(5);
             noVentCooldown = DrawToggle(noVentCooldown, "No Vent Cooldown", 160);
             GUILayout.EndVertical();
-
             GUILayout.Space(5);
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("Scientist", headerStyle);
@@ -2531,25 +2765,20 @@ namespace NjordMenu
             GUILayout.Space(5);
             noVitalsCooldown = DrawToggle(noVitalsCooldown, "No Vitals Cooldown", 160);
             GUILayout.EndVertical();
-
             GUILayout.Space(5);
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("Detective", headerStyle);
             UnlimitedInterrogateRange = DrawToggle(UnlimitedInterrogateRange, "Interrogate Reach", 160);
             GUILayout.EndVertical();
-
             GUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
         }
-
         private Vector2 doorsScrollPos = Vector2.zero;
-
         private void DrawSabotagesTab()
         {
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("CRITICAL SABOTAGES", headerStyle);
-
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("FIX ALL SABOTAGES", activeTabStyle, GUILayout.Height(35))) FixAllSabotages();
             GUI.backgroundColor = new Color(1f, 0.3f, 0.3f, 1f);
@@ -2557,35 +2786,27 @@ namespace NjordMenu
             GUI.backgroundColor = Color.white;
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
-
             if (GUILayout.Button("CALL MEETING (LEGIT / PUBLIC)", btnStyle, GUILayout.Height(35))) callMeetingPublic();
             GUILayout.Space(10);
-
             GUILayout.BeginHorizontal();
             GUI.backgroundColor = reactorSab ? new Color(1f, 0.3f, 0.3f, 1f) : Color.white;
             if (GUILayout.Button(reactorSab ? "Reactor: ON" : "Reactor", reactorSab ? activeTabStyle : btnStyle, GUILayout.Height(35))) { reactorSab = !reactorSab; ToggleReactor(reactorSab); }
-
             GUI.backgroundColor = oxygenSab ? new Color(1f, 0.3f, 0.3f, 1f) : Color.white;
             if (GUILayout.Button(oxygenSab ? "Oxygen: ON" : "Oxygen", oxygenSab ? activeTabStyle : btnStyle, GUILayout.Height(35))) { oxygenSab = !oxygenSab; ToggleO2(oxygenSab); }
             GUI.backgroundColor = Color.white;
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
-
             GUILayout.BeginHorizontal();
             GUI.backgroundColor = commsSab ? new Color(0.3f, 1f, 0.3f, 1f) : Color.white;
             if (GUILayout.Button(commsSab ? "Comms: ON" : "Comms", commsSab ? activeTabStyle : btnStyle, GUILayout.Height(35))) { commsSab = !commsSab; ToggleComms(commsSab); }
-
             GUI.backgroundColor = elecSab ? new Color(0.3f, 1f, 0.3f, 1f) : Color.white;
             if (GUILayout.Button(elecSab ? "Lights: ON" : "Lights", elecSab ? activeTabStyle : btnStyle, GUILayout.Height(35))) { elecSab = !elecSab; ToggleLights(elecSab); }
             GUI.backgroundColor = Color.white;
             GUILayout.EndHorizontal();
-
             GUILayout.Space(10);
             if (GUILayout.Button("Trigger Mushroom (Fungle)", btnStyle, GUILayout.Height(30))) SabotageMushroom();
             GUILayout.EndVertical();
-
             GUILayout.Space(10);
-
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("DOORS CONTROL", headerStyle);
             GUILayout.BeginHorizontal();
@@ -2593,12 +2814,9 @@ namespace NjordMenu
             if (GUILayout.Button("Open All Doors", btnStyle, GUILayout.Height(30))) OpenAllDoors();
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
-
             GUILayout.Space(10);
-
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("SPECIFIC DOORS", headerStyle);
-
             if (ShipStatus.Instance != null && ShipStatus.Instance.AllDoors != null)
             {
                 var rooms = ShipStatus.Instance.AllDoors.Select(d => d.Room).Distinct().ToList();
@@ -2607,7 +2825,6 @@ namespace NjordMenu
                     GUILayout.BeginHorizontal(boxStyle);
                     GUILayout.Label($"<b>{room}</b>", toggleLabelStyle, GUILayout.Width(130));
                     GUILayout.FlexibleSpace();
-
                     if (GUILayout.Button("Close", btnStyle, GUILayout.Width(70), GUILayout.Height(25)))
                     {
                         try
@@ -2655,7 +2872,6 @@ namespace NjordMenu
                         return;
                     }
                 }
-
                 PlayerControl.LocalPlayer.CmdReportDeadBody(null);
                 ShowNotification("<color=#00FF00>[MEETING]</color> Легально нажата кнопка собрания!");
             }
@@ -2673,12 +2889,10 @@ namespace NjordMenu
                 oxygenSab = true;
                 commsSab = true;
                 elecSab = true;
-
                 ToggleReactor(true);
                 ToggleO2(true);
                 ToggleComms(true);
                 ToggleLights(true);
-
                 ShowNotification("<color=#FF0000>[SABOTAGE]</color> Все системы саботированы!");
             }
             catch (Exception ex) { Debug.Log("Trigger All Sabotages Error: " + ex.Message); }
@@ -2692,12 +2906,10 @@ namespace NjordMenu
                 oxygenSab = false;
                 commsSab = false;
                 elecSab = false;
-
                 ToggleReactor(false);
                 ToggleO2(false);
                 ToggleComms(false);
                 ToggleLights(false);
-
                 if (ShipStatus.Instance.AllDoors != null)
                 {
                     foreach (var door in ShipStatus.Instance.AllDoors)
@@ -2714,7 +2926,6 @@ namespace NjordMenu
             }
             catch (Exception ex) { Debug.Log("Fix All Sabotages Error: " + ex.Message); }
         }
-
         private void SabotageDoors()
         {
             if (ShipStatus.Instance == null || ShipStatus.Instance.AllDoors == null) return;
@@ -2737,7 +2948,6 @@ namespace NjordMenu
             }
             catch { }
         }
-
         private void OpenAllDoors()
         {
             if (ShipStatus.Instance == null || ShipStatus.Instance.AllDoors == null) return;
@@ -2755,7 +2965,6 @@ namespace NjordMenu
             }
             catch { }
         }
-
         private void ToggleReactor(bool state) { if (ShipStatus.Instance == null) return; byte flag = (byte)(state ? 128 : 16); try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Reactor, flag); ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Laboratory, flag); if (state) ShipStatus.Instance.RpcUpdateSystem(SystemTypes.HeliSabotage, (byte)128); else { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.HeliSabotage, (byte)16); ShipStatus.Instance.RpcUpdateSystem(SystemTypes.HeliSabotage, (byte)17); } } catch { } }
         private void ToggleO2(bool state) { if (ShipStatus.Instance == null) return; try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.LifeSupp, (byte)(state ? 128 : 16)); } catch { } }
         private void ToggleComms(bool state) { if (ShipStatus.Instance == null) return; try { if (state) ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Comms, (byte)128); else { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Comms, (byte)16); ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Comms, (byte)17); } } catch { } }
@@ -2787,7 +2996,6 @@ namespace NjordMenu
             catch { }
         }
         private void SabotageMushroom() { if (ShipStatus.Instance == null) return; try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.MushroomMixupSabotage, (byte)1); } catch { } }
-
         private void DrawPlayersRoles()
         {
             GUILayout.BeginVertical(boxStyle);
@@ -2809,7 +3017,6 @@ namespace NjordMenu
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
-
             GUILayout.Space(10);
             GUILayout.BeginHorizontal();
             GUILayout.BeginVertical(boxStyle, GUILayout.Width(200));
@@ -2827,7 +3034,6 @@ namespace NjordMenu
             }
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
-
             GUILayout.BeginVertical(boxStyle, GUILayout.ExpandWidth(true));
             preRolesActionScrollPos = GUILayout.BeginScrollView(preRolesActionScrollPos);
             PlayerControl target = lockedPlayersList.FirstOrDefault(p => p.PlayerId == selectedPreRoleId);
@@ -2877,28 +3083,21 @@ namespace NjordMenu
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
         }
-
         private void DrawMenuTab()
         {
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("MENU CUSTOMIZATION", headerStyle);
             GUILayout.Space(5);
-
             bool prevRgb = rgbMenuMode;
             rgbMenuMode = DrawToggle(rgbMenuMode, "RGB Menu Mode");
             if (prevRgb && !rgbMenuMode) UpdateAccentColor(menuColors[currentMenuColorIndex]);
-
             GUILayout.Space(5);
-
             bool prevBg = enableBackground;
             enableBackground = DrawToggle(enableBackground, "Enable Image Background");
             if (enableBackground && !prevBg) LoadBackgroundImage();
-
             GUILayout.Space(5);
             GUILayout.Label("<color=#777777>Put 'MenuBG.png' or .jpg in BepInEx/config to add a background image.</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11 });
-
             GUILayout.Space(10);
-
             GUILayout.BeginHorizontal();
             GUIStyle middleColorStyle = new GUIStyle(btnStyle) { normal = { background = null, textColor = currentAccentColor }, fontStyle = FontStyle.Bold };
             GUI.enabled = !rgbMenuMode;
@@ -2909,9 +3108,7 @@ namespace NjordMenu
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
-
             GUILayout.Space(10);
-
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("SPOOF MENU IDENTITY", headerStyle);
             SpoofMenuEnabled = DrawToggle(SpoofMenuEnabled, "Enable Fake RPC");
@@ -2924,9 +3121,7 @@ namespace NjordMenu
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
-
             GUILayout.Space(10);
-
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("NOTIFICATIONS & LOGGING", headerStyle);
             GUILayout.Space(5);
@@ -2943,38 +3138,32 @@ namespace NjordMenu
         public static bool AutoHostWaitLoadedPlayers = true;
         public static bool AutoHostCancelBelowMin = true;
         public static bool AutoHostInstantStart = false;
-
         public static int AutoHostMinPlayers = 4;
         public static int AutoHostForceMinPlayers = 2;
         public static float AutoHostStartDelaySeconds = 15f;
         public static float AutoHostBackoffSeconds = 8f;
         public static float AutoHostWarmupSeconds = 5f;
         public static float AutoHostLoadGraceSeconds = 20f;
-
         public static int AutoHostForceAfterMinutes = 0;
         public static int AutoHostFastStartPlayers = 13;
         public static float AutoHostFastStartDelaySeconds = 5f;
-
         private int currentAutoHostSubTab = 0;
         private string[] autoHostSubTabs = { "LOBBY CONTROLS", "ROLE MANAGER", "ANTI CHEAT", "AUTO HOST" };
         private void DrawOutfitsTab()
         {
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("COPY SPECIFIC PLAYER", headerStyle);
-
             outfitsScrollPos = GUILayout.BeginScrollView(outfitsScrollPos);
             if (lockedPlayersList.Count > 0)
             {
                 foreach (var pc in lockedPlayersList)
                 {
                     if (pc == null || pc == PlayerControl.LocalPlayer || pc.Data == null) continue;
-
                     GUILayout.BeginHorizontal(boxStyle);
                     try
                     {
                         string pName = pc.Data.PlayerName ?? "Unknown";
                         GUILayout.Label(pName, GUILayout.Width(150));
-
                         if (GUILayout.Button("Copy Outfit", btnStyle, GUILayout.Height(25)))
                         {
                             try
@@ -2999,13 +3188,63 @@ namespace NjordMenu
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
         }
+        public static bool removePenalty = true;
+        public static bool alwaysShowLobbyTimer = false;
+        public static bool enableChatLog = true;
+        public static bool enableFastChat = true;
+        public static bool allowLinksAndSymbols = false;
+        private static readonly System.Collections.Generic.Dictionary<string, Sprite> CachedSprites = new();
+        public static Sprite LoadEmbeddedSprite(string fileName, float pixelsPerUnit = 1f)
+        {
+            string path = $"NjordMenu.{fileName}";
+            try
+            {
+                if (CachedSprites.TryGetValue(path + pixelsPerUnit, out var cachedSprite))
+                    return cachedSprite;
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                using var stream = assembly.GetManifestResourceStream(path);
+                if (stream == null)
+                {
+                    System.Console.WriteLine($"[NJORD] Стрим равен null! Убедись, что {fileName} установлен как Embedded Resource.");
+                    return null;
+                }
+                var texture = new Texture2D(1, 1, TextureFormat.ARGB32, false);
+                using System.IO.MemoryStream ms = new System.IO.MemoryStream();
+                stream.CopyTo(ms);
+                ImageConversion.LoadImage(texture, ms.ToArray(), false);
+                Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+                sprite.hideFlags |= HideFlags.HideAndDontSave | HideFlags.DontSaveInEditor;
+                return CachedSprites[path + pixelsPerUnit] = sprite;
+            }
+            catch (System.Exception ex)
+            {
+                System.Console.WriteLine($"[NJORD] Ошибка загрузки спрайта {fileName}: " + ex.Message);
+                return null;
+            }
+        }
         public void Start()
         {
             if (enableBackground) LoadBackgroundImage();
             UnlockCosmetics();
             LoadConfig();
-
             LoadBanList();
+            try
+            {
+                int starts = UnityEngine.PlayerPrefs.GetInt("Njord_GameStarts", 0);
+                starts++;
+                string chatLogPath = System.IO.Path.Combine(Plugin.NjordFolder, "ChatLog.txt");
+                if (starts >= 3)
+                {
+                    if (System.IO.File.Exists(chatLogPath))
+                    {
+                        System.IO.File.WriteAllText(chatLogPath, string.Empty);
+                    }
+                    starts = 0;
+                }
+                UnityEngine.PlayerPrefs.SetInt("Njord_GameStarts", starts);
+                UnityEngine.PlayerPrefs.Save();
+            }
+            catch { }
         }
         public static KeyCode bindMagnetCursor = KeyCode.F9;
         public static bool isWaitBindMagnetCursor = false;
@@ -3013,26 +3252,20 @@ namespace NjordMenu
         {
             KeyCode toggleKey = keyBinds.ContainsKey("Toggle Menu") ? keyBinds["Toggle Menu"] : KeyCode.Insert;
             if (Input.GetKeyDown(toggleKey) || Input.GetKeyDown(KeyCode.RightShift)) showMenu = !showMenu;
-
             bool isTypingOrBinding = isEditingName || isEditingLevel || isEditingBan ||
                                      isWaitingForBind || isWaitBindMassMorph || isWaitBindSpawnLobby ||
                                      isWaitBindDespawnLobby || isWaitBindCloseMeeting || isWaitBindInstaStart ||
                                      isWaitBindEndCrew || isWaitBindEndImp || isWaitBindEndImpDC || isWaitBindEndHnsDC;
-
             if (!isTypingOrBinding)
             {
                 if (bindMassMorph != KeyCode.None && Input.GetKeyDown(bindMassMorph))
                     this.StartCoroutine(MassMorphCoroutine().WrapToIl2Cpp());
-
                 if (bindSpawnLobby != KeyCode.None && Input.GetKeyDown(bindSpawnLobby))
                     SpawnLobby();
-
                 if (bindDespawnLobby != KeyCode.None && Input.GetKeyDown(bindDespawnLobby))
                     DespawnLobby();
-
                 if (bindCloseMeeting != KeyCode.None && Input.GetKeyDown(bindCloseMeeting) && MeetingHud.Instance != null)
                     MeetingHud.Instance.RpcClose();
-
                 if (bindInstaStart != KeyCode.None && Input.GetKeyDown(bindInstaStart) && GameStartManager.Instance != null)
                 {
                     GameStartManager.Instance.startState = GameStartManager.StartingStates.Countdown;
@@ -3050,10 +3283,8 @@ namespace NjordMenu
                 if (bindEndImpDC != KeyCode.None && Input.GetKeyDown(bindEndImpDC)) SmartEndGame("ImpDisconnect");
                 if (bindEndHnsDC != KeyCode.None && Input.GetKeyDown(bindEndHnsDC)) SmartEndGame("HnsImpDisconnect");
             }
-
             NjordAutoHostService.Tick();
             NjordAutoLobbyReturn.UpdateLogic();
-
             if (stylesInited && rgbMenuMode)
             {
                 rgbMenuHue += Time.deltaTime * 0.2f;
@@ -3069,9 +3300,8 @@ if (PlayerControl.LocalPlayer != null)
                         "<color=#00FF00>[MAGNET]</color> Magnet Cursor: ON" : 
                         "<color=#FF0000>[MAGNET]</color> Magnet Cursor: OFF");
                 }
-
-                if ((tpToCursor && Input.GetMouseButtonDown(1)) || 
-                    (dragToCursor && Input.GetMouseButton(2)) || 
+                if ((tpToCursor && Input.GetMouseButtonDown(1)) ||
+                    (dragToCursor && Input.GetMouseButton(2)) ||
                     autoFollowCursor)
                 {
                     if (Camera.main != null)
@@ -3081,7 +3311,89 @@ if (PlayerControl.LocalPlayer != null)
                         PlayerControl.LocalPlayer.NetTransform.RpcSnapTo(mPos);
                     }
                 }
-
+                try
+                {
+                    if (noTaskMode && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+                    {
+                        if (GameOptionsManager.Instance != null && GameOptionsManager.Instance.CurrentGameOptions != null)
+                        {
+                            var opts = GameOptionsManager.Instance.CurrentGameOptions;
+                            opts.SetInt(Int32OptionNames.NumCommonTasks, 0);
+                            opts.SetInt(Int32OptionNames.NumLongTasks, 0);
+                            opts.SetInt(Int32OptionNames.NumShortTasks, 0);
+                        }
+                    }
+                }
+                catch { }
+                if (autoKickBugs && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && fortegreenTimer.Count > 0)
+                {
+                    foreach (var kvp in fortegreenTimer.ToList())
+                    {
+                        if (Time.time >= kvp.Value)
+                        {
+                            byte pid = kvp.Key;
+                            var player = GameData.Instance.GetPlayerById(pid);
+                            if (player != null && !player.Disconnected && player.Object != null)
+                            {
+                                int currentColor = (int)player.DefaultOutfit.ColorId;
+                                if (currentColor == 18 || currentColor >= Palette.PlayerColors.Length)
+                                {
+                                    AmongUsClient.Instance.KickPlayer(player.ClientId, false);
+                                    ShowNotification($"<color=#FF0000>[AUTO-KICK]</color> Игрок <b>{player.PlayerName}</b> кикнут (Баг цвета)!");
+                                }
+                            }
+                            fortegreenTimer.Remove(pid);
+                        }
+                    }
+                }
+                if (PlayerControl.LocalPlayer != null)
+                {
+                    try
+                    {
+                        if (AnimAsteroidsEnabled)
+                        {
+                            PlayerControl.LocalPlayer.PlayAnimation((byte)TaskTypes.ClearAsteroids);
+                            RpcPlayAnimationMessage rpcMessage = new(PlayerControl.LocalPlayer.NetId, (byte)TaskTypes.ClearAsteroids);
+                            AmongUsClient.Instance.LateBroadcastUnreliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
+                        }
+                        if (AnimShieldsEnabled)
+                        {
+                            PlayerControl.LocalPlayer.PlayAnimation((byte)TaskTypes.PrimeShields);
+                            RpcPlayAnimationMessage rpcMessage = new(PlayerControl.LocalPlayer.NetId, (byte)TaskTypes.PrimeShields);
+                            AmongUsClient.Instance.LateBroadcastUnreliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
+                        }
+                        if (IsScanning && !isScannerActiveFlag)
+                        {
+                            var count = ++PlayerControl.LocalPlayer.scannerCount;
+                            PlayerControl.LocalPlayer.SetScanner(true, count);
+                            RpcSetScannerMessage rpcMessage = new(PlayerControl.LocalPlayer.NetId, true, count);
+                            AmongUsClient.Instance.LateBroadcastReliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
+                            isScannerActiveFlag = true;
+                        }
+                        else if (!IsScanning && isScannerActiveFlag)
+                        {
+                            var count = ++PlayerControl.LocalPlayer.scannerCount;
+                            PlayerControl.LocalPlayer.SetScanner(false, count);
+                            RpcSetScannerMessage rpcMessage = new(PlayerControl.LocalPlayer.NetId, false, count);
+                            AmongUsClient.Instance.LateBroadcastReliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
+                            isScannerActiveFlag = false;
+                        }
+                        if (ShipStatus.Instance != null)
+                        {
+                            if (AnimCamsInUseEnabled && !isCamsActiveFlag)
+                            {
+                                ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Security, 1);
+                                isCamsActiveFlag = true;
+                            }
+                            else if (!AnimCamsInUseEnabled && isCamsActiveFlag)
+                            {
+                                ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Security, 0);
+                                isCamsActiveFlag = false;
+                            }
+                        }
+                    }
+                    catch { }
+                }
                 try
                 {
                     if (PlayerControl.LocalPlayer != null && PlayerControl.LocalPlayer.MyPhysics != null && PlayerControl.LocalPlayer.Data != null)
@@ -3090,10 +3402,8 @@ if (PlayerControl.LocalPlayer != null)
                         {
                             PlayerControl.LocalPlayer.Collider.enabled = !(noClip || PlayerControl.LocalPlayer.onLadder);
                         }
-
                         float baseSpeed = 3f;
                         float targetSpeed = walkSpeed * baseSpeed;
-
                         if (PlayerControl.LocalPlayer.Data.IsDead)
                         {
                             PlayerControl.LocalPlayer.MyPhysics.GhostSpeed = targetSpeed;
@@ -3105,11 +3415,8 @@ if (PlayerControl.LocalPlayer != null)
                     }
                 }
                 catch { }
-
                 if (wasShowMenu && !showMenu) SaveConfig();
                 wasShowMenu = showMenu;
-
-
                 if (SpoofMenuEnabled && PlayerControl.LocalPlayer != null)
                 {
                     uiSpoofTimer += Time.deltaTime;
@@ -3132,7 +3439,6 @@ if (PlayerControl.LocalPlayer != null)
                         foreach (var pc in PlayerControl.AllPlayerControls)
                         {
                             if (pc == null || pc.Data == null || pc.Data.Disconnected || pc == PlayerControl.LocalPlayer) continue;
-
                             string fc = pc.Data.FriendCode;
                             if (!string.IsNullOrEmpty(fc))
                             {
@@ -3172,7 +3478,6 @@ if (PlayerControl.LocalPlayer != null)
                     }
                     _freecamActive = false;
                 }
-
                 try
                 {
                     if (cameraZoom && Camera.main != null && Input.GetAxis("Mouse ScrollWheel") != 0f)
@@ -3182,7 +3487,6 @@ if (PlayerControl.LocalPlayer != null)
                     }
                 }
                 catch { }
-
                 try
                 {
                     if (rainbowPlayers.Count > 0 && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && PlayerControl.AllPlayerControls != null)
@@ -3211,9 +3515,6 @@ if (PlayerControl.LocalPlayer != null)
                     }
                 }
                 catch { }
-
-
-
                 if (!isEditingLevel && uint.TryParse(spoofLevelString, out uint parsedLvl))
                 {
                     uint targetLevel = parsedLvl > 0 ? parsedLvl - 1 : 0;
@@ -3246,10 +3547,8 @@ if (PlayerControl.LocalPlayer != null)
                             colorTimer = 0f;
                             currentColorId++;
                             if (currentColorId > 17) currentColorId = 0;
-
                             if (localRainbow && PlayerControl.LocalPlayer != null)
                                 PlayerControl.LocalPlayer.CmdCheckColor(currentColorId);
-
                             if (rainbowPlayers.Count > 0 && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && PlayerControl.AllPlayerControls != null)
                             {
                                 foreach (var p in PlayerControl.AllPlayerControls)
@@ -3261,24 +3560,29 @@ if (PlayerControl.LocalPlayer != null)
                         }
                     }
                 }
-
-
                 catch { }
-
-
             }
         }
-
-
+        public static void ForceSetScanner(PlayerControl player, bool toggle)
+        {
+            var count = ++player.scannerCount;
+            player.SetScanner(toggle, count);
+            RpcSetScannerMessage rpcMessage = new(player.NetId, toggle, count);
+            AmongUsClient.Instance.LateBroadcastReliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
+        }
+        public static void ForcePlayAnimation(byte animationType)
+        {
+            PlayerControl.LocalPlayer.PlayAnimation(animationType);
+            RpcPlayAnimationMessage rpcMessage = new(PlayerControl.LocalPlayer.NetId, animationType);
+            AmongUsClient.Instance.LateBroadcastUnreliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
+        }
         public void OnGUI()
         {
             Event e = Event.current;
-
             bool isTyping = isEditingName || isEditingLevel || isEditingBan;
             bool isBinding = isWaitingForBind || isWaitBindMassMorph || isWaitBindSpawnLobby || isWaitBindDespawnLobby ||
                   isWaitBindCloseMeeting || isWaitBindInstaStart || isWaitBindEndCrew || isWaitBindEndImp ||
                   isWaitBindEndImpDC || isWaitBindEndHnsDC || isWaitBindMagnetCursor;
-
             if (e != null && e.isKey && e.type == EventType.KeyDown)
             {
                 if (e.keyCode == KeyCode.Escape)
@@ -3299,7 +3603,6 @@ if (PlayerControl.LocalPlayer != null)
                     else if (isWaitBindEndImp) { bindEndImp = e.keyCode; }
                     else if (isWaitBindEndImpDC) { bindEndImpDC = e.keyCode; }
                     else if (isWaitBindEndHnsDC) { bindEndHnsDC = e.keyCode; }
-
                     ResetAllBindWaits();
                     SaveConfig();
                     e.Use();
@@ -3328,7 +3631,6 @@ if (PlayerControl.LocalPlayer != null)
                     e.Use();
                 }
             }
-
             if (Event.current.type == EventType.Layout)
             {
                 lockedPlayersList.Clear();
@@ -3340,21 +3642,17 @@ if (PlayerControl.LocalPlayer != null)
                             lockedPlayersList.Add(p);
                     }
                 }
-
                 if (!stylesInited) InitStyles();
-
                 if (showMenu)
                 {
                     windowRect = GUI.Window(0, windowRect, (Action<int>)DrawNjordMenu, "", windowStyle);
                 }
-
                 for (int i = screenNotifications.Count - 1; i >= 0; i--)
                 {
                     screenNotifications[i].lifetime += Time.deltaTime;
                     if (screenNotifications[i].HasExpired) screenNotifications.RemoveAt(i);
                 }
             }
-        
             try
             {
                 if (AmongUsClient.Instance != null && (AmongUsClient.Instance.GameState == InnerNetClient.GameStates.Joined || AmongUsClient.Instance.GameState == InnerNetClient.GameStates.Started))
@@ -3366,7 +3664,6 @@ if (PlayerControl.LocalPlayer != null)
                         {
                             if (pc != null && pc.Data != null) currentIds.Add(pc.PlayerId);
                         }
-
                         foreach (var id in currentIds)
                         {
                             if (!lastPlayerIds.Contains(id) && !pendingJoinTimers.ContainsKey(id))
@@ -3374,7 +3671,6 @@ if (PlayerControl.LocalPlayer != null)
                                 pendingJoinTimers[id] = 1.5f;
                             }
                         }
-
                         var keysToProcess = pendingJoinTimers.Keys.ToList();
                         foreach (var id in keysToProcess)
                         {
@@ -3382,7 +3678,6 @@ if (PlayerControl.LocalPlayer != null)
                             if (pendingJoinTimers[id] <= 0f)
                             {
                                 pendingJoinTimers.Remove(id);
-
                                 var pc = PlayerControl.AllPlayerControls.ToArray().FirstOrDefault(p => p != null && p.PlayerId == id);
                                 if (pc != null && pc.Data != null && !pc.Data.Disconnected)
                                 {
@@ -3395,10 +3690,8 @@ if (PlayerControl.LocalPlayer != null)
                                             if (rawLevel != uint.MaxValue && rawLevel < 10000) level = (int)rawLevel + 1;
                                         }
                                         catch { }
-
                                         string platform = GetPlatform(AmongUsClient.Instance.GetClientFromCharacter(pc));
                                         string fc = string.IsNullOrEmpty(pc.Data.FriendCode) ? "Hidden" : pc.Data.FriendCode;
-
                                         ShowNotification($"<color=#00FF00>[+]</color> {pc.Data.PlayerName} joined\n<color=#aaaaaa>Lvl: {level} | {platform} | FC: {fc}</color>");
                                     }
                                     else
@@ -3408,12 +3701,10 @@ if (PlayerControl.LocalPlayer != null)
                                 }
                             }
                         }
-
                         foreach (var id in lastPlayerIds)
                         {
                             if (!currentIds.Contains(id)) pendingJoinTimers.Remove(id);
                         }
-
                         lastPlayerIds = new List<byte>(currentIds);
                     }
                 }
@@ -3432,11 +3723,9 @@ if (PlayerControl.LocalPlayer != null)
                 {
                     NjordNotification notif = screenNotifications[i];
                     int reverseIndex = screenNotifications.Count - 1 - i;
-
                     float slideOffset = 0f;
                     float animSpeed = 0.3f;
                     float currentAlpha = 0.95f;
-
                     if (notif.lifetime < animSpeed)
                     {
                         float t = Mathf.Clamp01(1f - (notif.lifetime / animSpeed));
@@ -3448,22 +3737,16 @@ if (PlayerControl.LocalPlayer != null)
                         slideOffset = t * t * 300f;
                         currentAlpha = Mathf.Lerp(0.95f, 0f, t);
                     }
-
                     float xPos = (float)Screen.width - notificationBoxSize.x - 15f + slideOffset;
                     float yPos = Screen.height - 150f - (reverseIndex * (notificationBoxSize.y + 5f));
-
                     GUI.color = new Color(0.12f, 0.12f, 0.12f, currentAlpha);
                     GUI.Box(new Rect(xPos, yPos, notificationBoxSize.x, notificationBoxSize.y), "", windowStyle);
-
                     GUI.color = new Color(1f, 1f, 1f, currentAlpha > 0.5f ? 1f : currentAlpha * 2f);
                     string accentHex = ColorUtility.ToHtmlStringRGB(currentAccentColor);
-
                     GUI.Label(new Rect(xPos + 10f, yPos + 5f, notificationBoxSize.x - 20f, 20f), $"<b><color=#{accentHex}>{notif.title}</color></b>");
-
                     float timeLeft = Mathf.Max(0, notif.ttl - notif.lifetime);
                     GUI.Label(new Rect(xPos + 10f, yPos + 5f, notificationBoxSize.x - 20f, 20f), $"<b><color=#{accentHex}>{timeLeft:F1}s</color></b>", new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperRight, fontSize = 12, richText = true });
                     GUI.Label(new Rect(xPos + 10f, yPos + 25f, notificationBoxSize.x - 20f, notificationBoxSize.y - 30f), notif.message, new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 12 });
-
                     float progress = 1f - (notif.lifetime / notif.ttl);
                     GUI.color = new Color(currentAccentColor.r, currentAccentColor.g, currentAccentColor.b, currentAlpha);
                     GUI.Box(new Rect(xPos + 8f, yPos + notificationBoxSize.y - 6f, (notificationBoxSize.x - 16f) * progress, 2f), "", safeLineStyle);
@@ -3471,9 +3754,6 @@ if (PlayerControl.LocalPlayer != null)
                 }
             }
         }
-
-
-
         private void DrawNjordMenu(int windowID)
         {
             if (Event.current.type == EventType.Repaint && tabTransitionProgress < 1f)
@@ -3481,7 +3761,6 @@ if (PlayerControl.LocalPlayer != null)
                 tabTransitionProgress += Time.unscaledDeltaTime * 8f;
                 if (tabTransitionProgress >= 1f) { tabTransitionProgress = 1f; currentTab = targetTabIndex; }
             }
-
             if (enableBackground && customMenuBg != null)
             {
                 GUI.color = new Color(0.6f, 0.6f, 0.6f, 0.8f);
@@ -3489,17 +3768,14 @@ if (PlayerControl.LocalPlayer != null)
                 GUI.Box(new Rect(0, 0, windowRect.width, windowRect.height), GUIContent.none, bgStyle);
                 GUI.color = Color.white;
             }
-
           GUILayout.BeginHorizontal();
             GUILayout.Label(ApplyMenuShimmer("NjordMenu Meowchelo & Carrot"), titleStyle);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("-", new GUIStyle(btnStyle) { fixedWidth = 20, fixedHeight = 18, margin = CreateRectOffset(0, 8, 6, 0) })) showMenu = false;
             GUILayout.EndHorizontal();
-
             GUI.color = new Color(1f, 1f, 1f, 0.1f);
             GUI.Box(new Rect(0, 30, windowRect.width, 1), "", safeLineStyle);
             GUI.color = Color.white;
-
             GUILayout.BeginArea(new Rect(0f, 31f, 130f, windowRect.height - 31f));
             GUILayout.BeginVertical(sidebarStyle, GUILayout.ExpandHeight(true));
             GUILayout.Space(5);
@@ -3508,11 +3784,9 @@ if (PlayerControl.LocalPlayer != null)
                     if (targetTabIndex != i) { targetTabIndex = i; tabTransitionProgress = 0f; scrollPosition = Vector2.zero; }
             GUILayout.EndVertical();
             GUILayout.EndArea();
-
             GUI.color = new Color(1f, 1f, 1f, 0.1f);
             GUI.Box(new Rect(130, 31, 1, windowRect.height), "", safeLineStyle);
             GUI.color = new Color(1f, 1f, 1f, tabTransitionProgress);
-
             GUILayout.BeginArea(new Rect(140f, 36f + ((1f - tabTransitionProgress) * 10f), windowRect.width - 150f, windowRect.height - 46f));
             scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
             int tabToDraw = (tabTransitionProgress < 1f) ? targetTabIndex : currentTab;
@@ -3520,24 +3794,185 @@ if (PlayerControl.LocalPlayer != null)
             else if (tabToDraw == 1) DrawSelfTab();
             else if (tabToDraw == 2) DrawVisualsTab();
             else if (tabToDraw == 3) DrawPlayersTab();
-            else if (tabToDraw == 4) DrawRolesTab();
-            else if (tabToDraw == 5) DrawSabotagesTab();
-            else if (tabToDraw == 6) DrawHostOnlyTab();
-            else if (tabToDraw == 7) DrawOutfitsTab();
-            else if (tabToDraw == 8) DrawMenuTab();
+            else if (tabToDraw == 4) DrawSabotagesTab();
+            else if (tabToDraw == 5) DrawHostOnlyTab();
+            else if (tabToDraw == 6) DrawOutfitsTab();
+            else if (tabToDraw == 7) DrawMenuTab();
+            else if (tabToDraw == 8) DrawMapsTab();
+            else if (tabToDraw == 9) DrawAnimationsTab();
             GUILayout.EndScrollView();
             GUILayout.EndArea();
-
             GUI.color = Color.white;
             GUI.DragWindow(new Rect(0, 0, 10000, 30));
         }
-
+        [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.HandleAnimation))]
+        public static class PlayerPhysics_HandleAnimation
+        {
+            public static bool Prefix(PlayerPhysics __instance)
+            {
+                if (NjordMenuGUI.moonWalk && __instance.AmOwner)
+                {
+                    __instance.ResetAnimState();
+                    return false;
+                }
+                return true;
+            }
+        }
+        [HarmonyPatch(typeof(FreeChatInputField), nameof(FreeChatInputField.UpdateCharCount))]
+        public static class FreeChatInputField_UpdateCharCount_Patch
+        {
+            public static void Postfix(FreeChatInputField __instance)
+            {
+                if (__instance == null || __instance.textArea == null || __instance.charCountText == null) return;
+                __instance.textArea.characterLimit = 120;
+                int length = __instance.textArea.text.Length;
+                __instance.charCountText.SetText($"{length}/{__instance.textArea.characterLimit}");
+                if (length < 90)
+                {
+                    __instance.charCountText.color = Color.white;
+                }
+                else if (length < 115)
+                {
+                    __instance.charCountText.color = Color.yellow;
+                }
+                else
+                {
+                    __instance.charCountText.color = Color.red;
+                }
+            }
+        }
+        public static class ChatHistory
+        {
+            public static List<string> sentMessages = new List<string>();
+            public static int HistoryIndex = -1;
+            public static string DraftBeforeHistory = "";
+            public static bool BrowsingHistory = false;
+            public static void Remember(string message)
+            {
+                if (string.IsNullOrWhiteSpace(message)) return;
+                bool isNewEntry = sentMessages.Count == 0 || sentMessages[sentMessages.Count - 1] != message;
+                if (isNewEntry)
+                {
+                    sentMessages.Add(message);
+                }
+                HistoryIndex = sentMessages.Count;
+            }
+            public static void HandleNavigation(ChatController chat)
+            {
+                if (sentMessages.Count == 0 || chat.freeChatField == null || chat.freeChatField.textArea == null || !chat.freeChatField.textArea.hasFocus)
+                    return;
+                if (Input.GetKeyDown(KeyCode.UpArrow))
+                {
+                    if (!BrowsingHistory)
+                    {
+                        DraftBeforeHistory = chat.freeChatField.textArea.text;
+                        BrowsingHistory = true;
+                    }
+                    if (HistoryIndex <= 0) return;
+                    HistoryIndex = Mathf.Clamp(HistoryIndex - 1, 0, sentMessages.Count - 1);
+                    chat.freeChatField.textArea.SetText(sentMessages[HistoryIndex], string.Empty);
+                }
+                else if (Input.GetKeyDown(KeyCode.DownArrow))
+                {
+                    if (!BrowsingHistory) return;
+                    HistoryIndex += 1;
+                    if (HistoryIndex < sentMessages.Count)
+                    {
+                        chat.freeChatField.textArea.SetText(sentMessages[HistoryIndex], string.Empty);
+                    }
+                    else
+                    {
+                        chat.freeChatField.textArea.SetText(DraftBeforeHistory, string.Empty);
+                        BrowsingHistory = false;
+                    }
+                }
+            }
+        }
+        public static class ClipboardBridge
+        {
+            public static void Run(TextBoxTMP box)
+            {
+                if (box == null || !box.hasFocus) return;
+                bool controlHeld = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+                if (!controlHeld) return;
+                if (Input.GetKeyDown(KeyCode.C))
+                {
+                    GUIUtility.systemCopyBuffer = box.text;
+                }
+                else if (Input.GetKeyDown(KeyCode.V))
+                {
+                    string paste = GUIUtility.systemCopyBuffer;
+                    if (!string.IsNullOrEmpty(paste))
+                    {
+                        box.SetText(box.text + paste, string.Empty);
+                    }
+                }
+                else if (Input.GetKeyDown(KeyCode.X))
+                {
+                    GUIUtility.systemCopyBuffer = box.text;
+                    box.SetText(string.Empty, string.Empty);
+                }
+            }
+        }
+        [HarmonyPatch(typeof(TextBoxTMP), nameof(TextBoxTMP.Update))]
+        public static class AllowSymbols_TextBoxTMP_Update_Patch
+        {
+            public static void Postfix(TextBoxTMP __instance)
+            {
+                __instance.allowAllCharacters = true;
+                __instance.AllowSymbols = true;
+                __instance.AllowEmail = true;
+            }
+        }
+        public static class Clipboard_TextBoxTMP_Patch
+        {
+            public static void Postfix(TextBoxTMP __instance)
+            {
+                ClipboardBridge.Run(__instance);
+            }
+        }
+        [HarmonyPatch(typeof(ChatController), nameof(ChatController.Update))]
+        public static class ChatHistory_Update_Patch
+        {
+            public static void Postfix(ChatController __instance)
+            {
+                ChatHistory.HandleNavigation(__instance);
+            }
+        }
+        public static bool enableExtendedChat = true;
+        public static bool enableChatHistory = true;
+        public static bool enableClipboard = true;
+        public static bool AnimEmptyGarbageEnabled = false;
+        public static bool skipShhhAnim = false;
+        public static bool isManualMapSpawn = false;
+        private void DrawAnimationsTab()
+        {
+            GUILayout.BeginVertical(boxStyle);
+            GUILayout.Label(L("LOOPED PLAYER ANIMATIONS", "ЗАЦИКЛЕННЫЕ АНИМАЦИИ ИГРОКА"), headerStyle);
+            string animInfo = L("<color=#777777>Animations are looped. They will run as long as the toggle is ON.</color>",
+                                "<color=#777777>Анимации зациклены. Будут работать, пока включен тумблер.</color>");
+            GUILayout.Label(animInfo, new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11, wordWrap = true });
+            GUILayout.Space(10);
+            GUILayout.BeginHorizontal();
+            AnimAsteroidsEnabled = DrawToggle(AnimAsteroidsEnabled, L("Weapons (Asteroids)", "Оружие (Астероиды)"), 250);
+            IsScanning = DrawToggle(IsScanning, L("Medbay Scan", "Скан в медпункте"), 250);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            AnimShieldsEnabled = DrawToggle(AnimShieldsEnabled, L("Turn On Shields", "Включить щиты"), 250);
+            AnimCamsInUseEnabled = DrawToggle(AnimCamsInUseEnabled, L("Use Cameras (Blink Red)", "Камеры (Красный индикатор)"), 250);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            AnimEmptyGarbageEnabled = DrawToggle(AnimEmptyGarbageEnabled, L("Empty Garbage", "Выкинуть мусор"), 250);
+            skipShhhAnim = DrawToggle(skipShhhAnim, L("Skip 'Shhh!' Intro", "Пропустить 'Shhh!' интро"), 250);
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
         public static string GetPlatform(ClientData client)
         {
             if (client == null || client.PlatformData == null) return "Unknown";
-
             int platformId = (int)client.PlatformData.Platform;
-
             switch (platformId)
             {
                 case 1: return "Epic";
@@ -3571,27 +4006,22 @@ if (PlayerControl.LocalPlayer != null)
                 default: return fallbackColor;
             }
         }
-
         public static void HandleTracer(PlayerControl target, bool enable)
         {
             try
             {
                 if (target == null || target.gameObject == null) return;
-
                 LineRenderer lr = target.GetComponent<LineRenderer>();
-
                 if (!enable || PlayerControl.LocalPlayer == null || target == PlayerControl.LocalPlayer || target.Data == null || target.Data.Disconnected)
                 {
                     if (lr != null) lr.enabled = false;
                     return;
                 }
-
                 if (target.Data.IsDead && !seeGhosts && !PlayerControl.LocalPlayer.Data.IsDead)
                 {
                     if (lr != null) lr.enabled = false;
                     return;
                 }
-
                 if (lr == null)
                 {
                     lr = target.gameObject.AddComponent<LineRenderer>();
@@ -3599,9 +4029,7 @@ if (PlayerControl.LocalPlayer != null)
                     lr.SetWidth(0.02f, 0.02f);
                     try { if (HatManager.Instance != null) lr.material = HatManager.Instance.PlayerMaterial; } catch { }
                 }
-
                 lr.enabled = true;
-
                 Color tColor = Color.white;
                 try
                 {
@@ -3615,23 +4043,17 @@ if (PlayerControl.LocalPlayer != null)
                     }
                 }
                 catch { }
-
                 lr.SetColors(tColor, tColor);
-
                 lr.SetPosition(0, PlayerControl.LocalPlayer.transform.position);
                 lr.SetPosition(1, target.transform.position);
             }
             catch { }
         }
-
-
         private void DrawLobbyControls()
         {
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("LOBBY CONTROLS", headerStyle);
-
             GUILayout.BeginHorizontal();
-
             GUILayout.BeginVertical(GUILayout.Width(280));
             neverEndGame = DrawToggle(neverEndGame, "Unlimited Game", 250);
             GUILayout.Space(5);
@@ -3645,29 +4067,23 @@ if (PlayerControl.LocalPlayer != null)
             GUILayout.Space(5);
             blockRainbowChat = DrawToggle(blockRainbowChat, "Block Rainbow Chat", 250);
             GUILayout.EndVertical();
-
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
             GUILayout.Space(15);
             GUILayout.Label("HOST ACTIONS", headerStyle);
-
             GUILayout.BeginHorizontal();
-
             GUILayout.BeginVertical(GUILayout.Width(280));
             if (GUILayout.Button("Insta Start", btnStyle, GUILayout.Height(25)))
             { GameStartManager.Instance.startState = GameStartManager.StartingStates.Countdown; GameStartManager.Instance.countDownTimer = 0f; }
             GUILayout.Space(5);
             if (GUILayout.Button("Close Meeting", btnStyle, GUILayout.Height(25))) MeetingHud.Instance.RpcClose();
             GUILayout.Space(5);
-
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Spawn Lobby", activeTabStyle, GUILayout.Height(25))) SpawnLobby();
             GUILayout.Space(5);
             if (GUILayout.Button("Despawn", btnStyle, GUILayout.Height(25))) DespawnLobby();
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
-
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Kill All", btnStyle, GUILayout.Height(25))) KillAll();
             GUILayout.Space(5);
@@ -3676,9 +4092,7 @@ if (PlayerControl.LocalPlayer != null)
             if (GUILayout.Button("Mass Morph", btnStyle, GUILayout.Height(25))) this.StartCoroutine(MassMorphCoroutine().WrapToIl2Cpp());
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
-
             GUILayout.Space(10);
-
             GUILayout.BeginVertical(GUILayout.Width(280));
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Crewmate Win", btnStyle, GUILayout.Height(25))) SmartEndGame("CrewWin");
@@ -3686,21 +4100,17 @@ if (PlayerControl.LocalPlayer != null)
             if (GUILayout.Button("Impostor Win", btnStyle, GUILayout.Height(25))) SmartEndGame("ImpWin");
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
-
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Imp Disconnect", btnStyle, GUILayout.Height(25))) SmartEndGame("ImpDisconnect");
             GUILayout.Space(5);
             if (GUILayout.Button("H&S Disconnect", activeTabStyle, GUILayout.Height(25))) SmartEndGame("HnsImpDisconnect");
             GUILayout.EndHorizontal();
             GUILayout.Space(5);
-
             if (GUILayout.Button("Force End (Impostor Disconnect)", btnStyle, GUILayout.Height(25)) && GameManager.Instance != null && AmongUsClient.Instance.AmHost)
             { bool tempNeverEnd = neverEndGame; neverEndGame = false; GameManager.Instance.RpcEndGame((GameOverReason)4, false); neverEndGame = tempNeverEnd; }
             GUILayout.EndVertical();
-
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
             GUILayout.EndVertical();
         }
         public static string GetESPNameTag(NetworkedPlayerInfo info, string originalName)
@@ -3731,20 +4141,16 @@ if (PlayerControl.LocalPlayer != null)
                     if (client != null) { platform = GetPlatform(client); if (AmongUsClient.Instance.GetHost() == client) hostStr = "Host - "; }
                 }
                 catch { }
-
                 string accentHex = ColorUtility.ToHtmlStringRGB(currentAccentColor);
                 newName = $"<size=80%><color=#{accentHex}>{hostStr}Lv:{level} - {platform}</color></size>\n{newName}";
             }
             return newName;
         }
-
-
         [HarmonyPatch(typeof(VersionShower), nameof(VersionShower.Start))]
     public static class VersionShower_Start_Patch
     {
         public static void Postfix(VersionShower __instance) { if (__instance != null && __instance.text != null) __instance.text.text = NjordMenuGUI.ApplyMenuShimmer("NjordMenu Meowchelo & Carrot"); }
     }
-
         [HarmonyPatch(typeof(PingTracker), nameof(PingTracker.Update))]
         public static class PingTracker_Watermark_Patch
         {
@@ -3759,15 +4165,12 @@ if (PlayerControl.LocalPlayer != null)
                     if (_updateTimer >= 0.5f) { _smoothFps = 1f / Time.deltaTime; if (AmongUsClient.Instance != null) _smoothPing = AmongUsClient.Instance.Ping; _updateTimer = 0f; }
                     int num = Mathf.RoundToInt(_smoothFps);
                     string pingColor = ((_smoothPing < 80) ? "#00FF00" : ((_smoothPing < 400) ? "#FFFF00" : "#FF0000"));
-
                     string finalString = $"<color=#FFFFFF>PING:</color> <color={pingColor}>{_smoothPing} ms</color> • <color=#FFFFFF>FPS:</color> <color=#FFFFFF>{num}</color>";
-
                     if (NjordMenuGUI.showWatermark)
                     {
-                        string shimmerTitle = NjordMenuGUI.ApplyMenuShimmer("NjordMenu v1.2.3");
+                        string shimmerTitle = NjordMenuGUI.ApplyMenuShimmer("NjordMenu v1.2.4");
                         finalString = $"{shimmerTitle} • " + finalString;
                     }
-
                     if (AmongUsClient.Instance != null)
                     {
                         ClientData host = AmongUsClient.Instance.GetHost();
@@ -3788,7 +4191,6 @@ if (PlayerControl.LocalPlayer != null)
                 catch { }
             }
         }
-
         [HarmonyPatch(typeof(GameStartManager), nameof(GameStartManager.Update))]
     public static class GameStartManager_Update_Patch
     {
@@ -3805,10 +4207,8 @@ if (PlayerControl.LocalPlayer != null)
             }
         }
     }
-
     [HarmonyPatch(typeof(GameManager), nameof(GameManager.RpcEndGame))]
     public static class InfiniteGamePatch { public static bool Prefix() { try { if (NjordMenuGUI.neverEndGame && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost) return false; } catch { } return true; } }
-
     [HarmonyPatch(typeof(IntroCutscene), "CoBegin")]
     public static class IntroCutscene_CoBegin_Patch
     {
@@ -3824,7 +4224,6 @@ if (PlayerControl.LocalPlayer != null)
             }
         }
     }
-
     [HarmonyPatch(typeof(LogicRoleSelectionNormal), "AssignRolesForTeam")]
     public static class RoleSelectionNormal_Patch
     {
@@ -3885,7 +4284,6 @@ if (PlayerControl.LocalPlayer != null)
             catch { return true; }
         }
     }
-
     [HarmonyPatch(typeof(LogicRoleSelectionHnS), "AssignRolesForTeam")]
     public static class RoleSelectionHnS_Patch
     {
@@ -3920,7 +4318,6 @@ if (PlayerControl.LocalPlayer != null)
             catch { return true; }
         }
     }
-
     [HarmonyPatch(typeof(RoleManager), nameof(RoleManager.SelectRoles))]
     public static class RoleManager_SelectRoles_Patch
     {
@@ -3967,10 +4364,8 @@ if (PlayerControl.LocalPlayer != null)
             catch { return true; }
         }
     }
-
     [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.TurnOnProtection))]
     public static class PlayerControl_TurnOnProtection_Patch { public static void Prefix(ref bool visible) { if (NjordMenuGUI.seeGhosts) visible = true; } }
-
     [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.LateUpdate))]
     public static class PlayerVisuals_LateUpdate_Patch
     {
@@ -3998,7 +4393,6 @@ if (PlayerControl.LocalPlayer != null)
             catch { }
         }
     }
-
     [HarmonyPatch(typeof(MeetingHud), nameof(MeetingHud.Update))]
     public static class ESP_MeetingHud
     {
@@ -4055,22 +4449,18 @@ if (PlayerControl.LocalPlayer != null)
                         if (client != null) { platform = NjordMenuGUI.GetPlatform(client); if (AmongUsClient.Instance.GetHost() == client) hostStr = "Host - "; }
                     }
                     catch { }
-
                     string accentHex = ColorUtility.ToHtmlStringRGB(NjordMenuGUI.currentAccentColor);
                     string extra = $" <color=#{accentHex}><size=80%>{hostStr}Lv:{level} - {platform}</size></color>";
-
                     if (!__instance.NameText.text.Contains("Lv:")) __instance.NameText.text += extra;
                 }
                 catch { }
             }
         }
-
    [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
     public static class FullBright_Patch
     {
         public static void Postfix(HudManager __instance) { if (__instance.ShadowQuad != null) __instance.ShadowQuad.gameObject.SetActive(!NjordMenuGUI.fullBright); }
     }
-
     [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
     public static class HudManager_Update_Patch
     {
@@ -4084,16 +4474,12 @@ if (PlayerControl.LocalPlayer != null)
             catch { }
         }
     }
-
     [HarmonyPatch(typeof(PlatformSpecificData), nameof(PlatformSpecificData.Serialize))]
     public static class PlatformSpooferPatch { public static void Prefix(PlatformSpecificData __instance) { try { if (NjordMenuGUI.enablePlatformSpoof && __instance != null) __instance.Platform = NjordMenuGUI.platformValues[NjordMenuGUI.currentPlatformIndex]; } catch { } } }
-
     [HarmonyPatch(typeof(FullAccount), nameof(FullAccount.CanSetCustomName))]
     public static class FullAccount_CanSetCustomName_Patch { public static void Prefix(ref bool canSetName) { try { if (NjordMenuGUI.unlockFeatures) canSetName = true; } catch { } } }
-
     [HarmonyPatch(typeof(AccountManager), nameof(AccountManager.CanPlayOnline))]
     public static class AccountManager_CanPlayOnline_Patch { public static void Postfix(ref bool __result) { try { if (NjordMenuGUI.unlockFeatures) __result = true; } catch { } } }
-
     [HarmonyPatch(typeof(EngineerRole), "FixedUpdate")]
     public static class EngineerCheatsPatch
     {
@@ -4109,7 +4495,6 @@ if (PlayerControl.LocalPlayer != null)
             }
         }
     }
-
     [HarmonyPatch(typeof(ScientistRole), "Update")]
     public static class ScientistCheatsPatch
     {
@@ -4120,13 +4505,11 @@ if (PlayerControl.LocalPlayer != null)
             if (NjordMenuGUI.endlessBattery) __instance.currentCharge = float.MaxValue;
         }
     }
-
     [HarmonyPatch(typeof(ShapeshifterRole), "FixedUpdate")]
     public static class ShapeshifterDurationPatch
     {
         public static void Postfix(ShapeshifterRole __instance) { if (__instance.Player == PlayerControl.LocalPlayer && NjordMenuGUI.endlessSsDuration) __instance.durationSecondsRemaining = float.MaxValue; }
     }
-
     [HarmonyPatch(typeof(ImpostorRole), "FindClosestTarget")]
     public static class ImpostorRangePatch
     {
@@ -4145,15 +4528,11 @@ if (PlayerControl.LocalPlayer != null)
             catch { return true; }
         }
     }
-
     [HarmonyPatch(typeof(ImpostorRole), "IsValidTarget")]
     public static class ImpostorKillAnyonePatch
     {
         public static void Postfix(NetworkedPlayerInfo target, ref bool __result) { try { if (NjordMenuGUI.killAnyone && target != null && target.PlayerId != PlayerControl.LocalPlayer.PlayerId && !target.IsDead) __result = true; } catch { } }
     }
-
-
-
     [HarmonyPatch(typeof(DetectiveRole), "FindClosestTarget")]
     public static class DetectiveRangePatch
     {
@@ -4172,7 +4551,6 @@ if (PlayerControl.LocalPlayer != null)
             catch { return true; }
         }
     }
-
     [HarmonyPatch(typeof(DoorBreakerGame), nameof(DoorBreakerGame.Start))]
     public static class DoorBreakerGame_Start_Patch
     {
@@ -4200,223 +4578,137 @@ if (PlayerControl.LocalPlayer != null)
     {
         public static bool Prefix(MushroomDoorSabotageMinigame __instance) { if (NjordMenuGUI.autoOpenDoors) { __instance.FixDoorAndCloseMinigame(); return false; } return true; }
     }
-
     [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetTasks))]
     public static class NoTaskMode_Patch { public static bool Prefix(PlayerControl __instance) { if (NjordMenuGUI.noTaskMode) return false; return true; } }
-    [HarmonyPatch(typeof(ChatController), nameof(ChatController.SendChat))]
-    public static class ChatController_SendChat_Patch
-    {
-        public static bool Prefix(ChatController __instance)
+        [HarmonyPatch(typeof(ChatController), nameof(ChatController.SendChat))]
+        public static class ChatController_SendChat_Patch
         {
-            if (__instance.freeChatField == null || __instance.freeChatField.textArea == null) return true;
-            string text = __instance.freeChatField.textArea.text;
-            if (string.IsNullOrWhiteSpace(text)) return true;
-
-            string lowerChat = text.ToLower().Trim();
-
-            if (NjordMenuGUI.enableColorCommand)
+            public static bool Prefix(ChatController __instance)
             {
-                if (lowerChat == "/rainbow" || lowerChat == "!rainbow" || lowerChat == "/lgbt" || lowerChat == "!lgbt")
+                if (__instance.freeChatField == null || __instance.freeChatField.textArea == null) return true;
+                string text = __instance.freeChatField.textArea.text;
+                if (string.IsNullOrWhiteSpace(text)) return true;
+                if (NjordMenuGUI.enableChatHistory)
                 {
-                    if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+                    ChatHistory.Remember(text);
+                }
+                string lowerChat = text.ToLower().Trim();
+                if (NjordMenuGUI.enableColorCommand)
+                {
+                    if (lowerChat == "/rainbow" || lowerChat == "!rainbow" || lowerChat == "/lgbt" || lowerChat == "!lgbt")
                     {
-                        if (NjordMenuGUI.rainbowPlayers.Contains(PlayerControl.LocalPlayer.PlayerId))
+                        if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                         {
-                            NjordMenuGUI.rainbowPlayers.Remove(PlayerControl.LocalPlayer.PlayerId);
-                            NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВЫКЛ.");
+                            if (NjordMenuGUI.rainbowPlayers.Contains(PlayerControl.LocalPlayer.PlayerId))
+                            {
+                                NjordMenuGUI.rainbowPlayers.Remove(PlayerControl.LocalPlayer.PlayerId);
+                                NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВЫКЛ.");
+                            }
+                            else
+                            {
+                                NjordMenuGUI.rainbowPlayers.Add(PlayerControl.LocalPlayer.PlayerId);
+                                NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВКЛ.");
+                            }
                         }
                         else
                         {
-                            NjordMenuGUI.rainbowPlayers.Add(PlayerControl.LocalPlayer.PlayerId);
-                            NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВКЛ.");
+                            if (HudManager.Instance?.Chat != null)
+                                HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Эта команда только для Хоста!");
                         }
+                        __instance.freeChatField.textArea.SetText("", "");
+                        return false;
                     }
-                    else
+                    if (lowerChat.StartsWith("/color ") || lowerChat.StartsWith("/c ") || lowerChat.StartsWith("/col ") ||
+                        lowerChat.StartsWith("!color ") || lowerChat.StartsWith("!c ") || lowerChat.StartsWith("!col "))
                     {
-                        if (HudManager.Instance?.Chat != null)
-                            HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Эта команда только для Хоста!");
-                    }
-                    __instance.freeChatField.textArea.SetText("", "");
-                    return false;
-                }
-
-                if (lowerChat.StartsWith("/color ") || lowerChat.StartsWith("/c ") || lowerChat.StartsWith("/col ") ||
-                    lowerChat.StartsWith("!color ") || lowerChat.StartsWith("!c ") || lowerChat.StartsWith("!col "))
-                {
-                    if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
-                    {
-                        string arg = lowerChat.Substring(lowerChat.IndexOf(' ') + 1).Trim();
-                        int colorId = -1;
-
-                        if (int.TryParse(arg, out int parsed)) colorId = parsed;
-                        else colorId = NjordMenuGUI.GetColorIdByName(arg);
-
-                        if (colorId >= 0 && colorId <= 18 && PlayerControl.LocalPlayer != null)
+                        if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                         {
-                            PlayerControl.LocalPlayer.RpcSetColor((byte)colorId);
+                            string arg = lowerChat.Substring(lowerChat.IndexOf(' ') + 1).Trim();
+                            int colorId = -1;
+                            if (int.TryParse(arg, out int parsed)) colorId = parsed;
+                            else colorId = NjordMenuGUI.GetColorIdByName(arg);
+                            if (colorId >= 0 && colorId <= 18 && PlayerControl.LocalPlayer != null)
+                            {
+                                PlayerControl.LocalPlayer.RpcSetColor((byte)colorId);
+                            }
+                            else if (HudManager.Instance?.Chat != null)
+                            {
+                                HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Используйте ID (0-18) или названия (красн, син, зел...)");
+                            }
+                        }
+                        else
+                        {
+                            if (HudManager.Instance?.Chat != null)
+                                HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Смена цвета доступна только Хосту!");
+                        }
+                        __instance.freeChatField.textArea.SetText("", "");
+                        return false;
+                    }
+                }
+                if (lowerChat.StartsWith("/w ") || lowerChat.StartsWith("/pm ") ||
+                 lowerChat.StartsWith("/msg ") || lowerChat.StartsWith("/am "))
+                {
+                    string[] parts = text.Split(new char[] { ' ' }, 3);
+                    if (parts.Length >= 3)
+                    {
+                        string targetInput = parts[1].ToLower().Trim();
+                        string message = parts[2];
+                        PlayerControl target = null;
+                        if (byte.TryParse(targetInput, out byte pid))
+                        {
+                            target = PlayerControl.AllPlayerControls.ToArray().FirstOrDefault(p => p.PlayerId == pid);
+                        }
+                        if (target == null && PlayerControl.AllPlayerControls != null)
+                        {
+                            PlayerControl exactMatch = null;
+                            PlayerControl partialMatch = null;
+                            foreach (var pc in PlayerControl.AllPlayerControls)
+                            {
+                                if (pc == null || pc.Data == null || pc.Data.Disconnected || pc == PlayerControl.LocalPlayer) continue;
+                                string rawName = Regex.Replace(pc.Data.PlayerName, "<.*?>", string.Empty).ToLower().Trim();
+                                int cId = (int)pc.Data.DefaultOutfit.ColorId;
+                                int targetColorId = NjordMenuGUI.GetColorIdByName(targetInput);
+                                if (rawName == targetInput || (targetColorId != -1 && cId == targetColorId))
+                                {
+                                    exactMatch = pc;
+                                    break;
+                                }
+                                if (rawName.StartsWith(targetInput))
+                                {
+                                    if (partialMatch == null) partialMatch = pc;
+                                }
+                            }
+                            target = exactMatch ?? partialMatch;
+                        }
+                        if (target != null && target != PlayerControl.LocalPlayer)
+                        {
+                            string safeMessage = Regex.Replace(message, "<.*?>", string.Empty).Replace("<", "").Replace(">", "");
+                            string networkMsg = $"шепчет вам:\n{safeMessage}";
+                            if (AmongUsClient.Instance != null && PlayerControl.LocalPlayer != null)
+                            {
+                                MessageWriter msgWriter = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, 13, Hazel.SendOption.Reliable, target.OwnerId);
+                                msgWriter.Write(networkMsg);
+                                AmongUsClient.Instance.FinishRpcImmediately(msgWriter);
+                            }
+                            string targetClean = Regex.Replace(target.Data.PlayerName, "<.*?>", string.Empty);
+                            if (HudManager.Instance?.Chat != null)
+                                HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, $"<color=#FFAC1C>Вы шепчете {targetClean}:\n{safeMessage}</color>");
                         }
                         else if (HudManager.Instance?.Chat != null)
                         {
-                            HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Используйте ID (0-18) или названия (красн, син, зел...)");
+                            HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Игрок не найден! Введите ID, Цвет или Имя.");
                         }
-                    }
-                    else
-                    {
-                        if (HudManager.Instance?.Chat != null)
-                            HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Смена цвета доступна только Хосту!");
                     }
                     __instance.freeChatField.textArea.SetText("", "");
                     return false;
                 }
+                return true;
             }
-
-            if (lowerChat.StartsWith("/w ") || lowerChat.StartsWith("/pm "))
-            {
-                string[] parts = text.Split(new char[] { ' ' }, 3);
-                if (parts.Length >= 3)
-                {
-                    string targetInput = parts[1].ToLower().Trim();
-                    string message = parts[2];
-                    PlayerControl target = null;
-
-                    if (byte.TryParse(targetInput, out byte pid))
-                    {
-                        target = PlayerControl.AllPlayerControls.ToArray().FirstOrDefault(p => p.PlayerId == pid);
-                    }
-
-                    if (target == null && PlayerControl.AllPlayerControls != null)
-                    {
-                        PlayerControl exactMatch = null;
-                        PlayerControl partialMatch = null;
-
-                        foreach (var pc in PlayerControl.AllPlayerControls)
-                        {
-                            if (pc == null || pc.Data == null || pc.Data.Disconnected || pc == PlayerControl.LocalPlayer) continue;
-
-                            string rawName = Regex.Replace(pc.Data.PlayerName, "<.*?>", string.Empty).ToLower().Trim();
-                            int cId = (int)pc.Data.DefaultOutfit.ColorId;
-                            int targetColorId = NjordMenuGUI.GetColorIdByName(targetInput);
-
-                            if (rawName == targetInput || (targetColorId != -1 && cId == targetColorId))
-                            {
-                                exactMatch = pc;
-                                break;
-                            }
-                            if (rawName.StartsWith(targetInput))
-                            {
-                                if (partialMatch == null) partialMatch = pc;
-                            }
-                        }
-                        target = exactMatch ?? partialMatch;
-                    }
-
-                    if (target != null && target != PlayerControl.LocalPlayer)
-                    {
-                        string safeMessage = Regex.Replace(message, "<.*?>", string.Empty).Replace("<", "").Replace(">", "");
-                        string networkMsg = $"шепчет вам:\n{safeMessage}";
-
-                        if (AmongUsClient.Instance != null && PlayerControl.LocalPlayer != null)
-                        {
-                            MessageWriter msgWriter = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, 13, Hazel.SendOption.Reliable, target.OwnerId);
-                            msgWriter.Write(networkMsg);
-                            AmongUsClient.Instance.FinishRpcImmediately(msgWriter);
-                        }
-
-                        string targetClean = Regex.Replace(target.Data.PlayerName, "<.*?>", string.Empty);
-                        if (HudManager.Instance?.Chat != null)
-                            HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, $"<color=#FFAC1C>Вы шепчете {targetClean}:\n{safeMessage}</color>");
-                    }
-                    else if (HudManager.Instance?.Chat != null)
-                    {
-                        HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Игрок не найден! Введите ID, Цвет или Имя.");
-                    }
-                }
-                __instance.freeChatField.textArea.SetText("", "");
-                return false;
-            }
-
-            return true;
         }
-    }
-    [HarmonyPatch(typeof(ChatController), nameof(ChatController.AddChat))]
-    public static class ChatController_AddChat_Patch
-    {
-        public static bool Prefix(PlayerControl sourcePlayer, ref string chatText, ChatController __instance)
-        {
-            if (string.IsNullOrEmpty(chatText)) return true;
-            string lowerText = chatText.ToLower().Trim();
-
-            if (NjordMenuGUI.enableColorCommand && sourcePlayer != null)
-            {
-                string[] colorCommands = { "/color ", "!color ", "/col ", "!col ", "/c ", "!c " };
-                string usedCmd = colorCommands.FirstOrDefault(cmd => lowerText.StartsWith(cmd));
-
-                if (usedCmd != null)
-                {
-                    if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
-                    {
-                        string colorInput = lowerText.Substring(usedCmd.Length).Trim();
-                        int colorId = -1;
-
-                        if (int.TryParse(colorInput, out int parsedId)) { if (parsedId >= 0 && parsedId <= 18) colorId = parsedId; }
-                        else colorId = NjordMenuGUI.GetColorIdByName(colorInput);
-
-                        if (colorId != -1)
-                        {
-                            if (colorId == 18 && NjordMenuGUI.blockFortegreenChat)
-                            {
-                                if (HudManager.Instance?.Chat != null)
-                                    HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Цвет Fortegreen запрещен хостом!");
-                            }
-                            else
-                            {
-                                sourcePlayer.RpcSetColor((byte)colorId);
-                            }
-                        }
-                        else if (sourcePlayer == PlayerControl.LocalPlayer)
-                        {
-                            __instance.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Неверный цвет.");
-                        }
-                    }
-                    return false;
-                }
-
-                if (lowerText == "/rainbow" || lowerText == "!rainbow" || lowerText == "/lgbt" || lowerText == "!lgbt")
-                {
-                    if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
-                    {
-                        if (NjordMenuGUI.blockRainbowChat)
-                        {
-                            if (HudManager.Instance?.Chat != null)
-                                HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Радуга запрещена хостом!");
-                        }
-                        else
-                        {
-                            if (NjordMenuGUI.rainbowPlayers.Contains(sourcePlayer.PlayerId))
-                            {
-                                NjordMenuGUI.rainbowPlayers.Remove(sourcePlayer.PlayerId);
-                                NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВЫКЛ.");
-                            }
-                            else
-                            {
-                                NjordMenuGUI.rainbowPlayers.Add(sourcePlayer.PlayerId);
-                                NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВКЛ.");
-                            }
-                        }
-                    }
-                    return false;
-                }
-            }
-            return true;
-        }
-
-
-
         public static void Postfix(GameStartManager __instance)
         {
             if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || PlayerControl.LocalPlayer == null) return;
             if (NjordMenuGUI.customStartTimer > 0f) return;
-
             if (NjordMenuGUI.fakeStartCounterTroll)
             {
                 try
@@ -4440,8 +4732,6 @@ if (PlayerControl.LocalPlayer != null)
         }
     }
 }
-
-
 [HarmonyPatch(typeof(ChatController), nameof(ChatController.Update))]
 public static class ChatController_Update_Patch
 {
@@ -4465,7 +4755,6 @@ public static class ChatController_Update_Patch
         catch { }
     }
 }
-
 [HarmonyPatch(typeof(ChatBubble), nameof(ChatBubble.SetText))]
 public static class DarkMode_ChatBubblePatch
 {
@@ -4477,7 +4766,7 @@ public static class DarkMode_ChatBubblePatch
             if (bg != null)
             {
                 var sr = bg.GetComponent<SpriteRenderer>();
-                if (sr != null) sr.color = new Color32(0, 0, 0, 128);
+                if (sr != null) sr.color = new Color32(35, 35, 35, 255);
             }
             if (__instance.TextArea != null)
                 __instance.TextArea.color = Color.white;
@@ -4485,7 +4774,6 @@ public static class DarkMode_ChatBubblePatch
         catch { }
     }
 }
-
 [HarmonyPatch(typeof(GameManager), nameof(GameManager.CheckTaskCompletion))]
 public static class GameManager_CheckTaskCompletion_Patch
 {
@@ -4499,7 +4787,6 @@ public static class GameManager_CheckTaskCompletion_Patch
         catch { return true; }
     }
 }
-
 [HarmonyPatch(typeof(ChatController), nameof(ChatController.SetVisible))]
 public static class ChatController_SetVisible_Patch
 {
@@ -4508,7 +4795,6 @@ public static class ChatController_SetVisible_Patch
         if (NjordMenuGUI.alwaysChat) visible = true;
     }
 }
-
 [HarmonyPatch(typeof(MeetingHud), "Update")]
 public static class RevealVotesPatch
 {
@@ -4566,7 +4852,6 @@ public static class RevealVotesCleanupPatch
         catch { }
     }
 }
-
 [HarmonyPatch(typeof(NumberOption), nameof(NumberOption.Increase))]
 public static class NumberOption_Increase_Patch
 {
@@ -4587,7 +4872,6 @@ public static class NumberOption_Increase_Patch
         catch { return true; }
     }
 }
-
 [HarmonyPatch(typeof(NumberOption), nameof(NumberOption.Decrease))]
 public static class NumberOption_Decrease_Patch
 {
@@ -4608,7 +4892,6 @@ public static class NumberOption_Decrease_Patch
         catch { return true; }
     }
 }
-
 [HarmonyPatch(typeof(NumberOption), nameof(NumberOption.Initialize))]
 public static class NumberOption_Initialize_Patch
 {
@@ -4625,7 +4908,6 @@ public static class NumberOption_Initialize_Patch
         catch { }
     }
 }
-
 [HarmonyPatch(typeof(IGameOptionsExtensions), nameof(IGameOptionsExtensions.GetAdjustedNumImpostors))]
 public static class IGameOptionsExtensions_GetAdjustedNumImpostors_Patch
 {
@@ -4640,12 +4922,10 @@ public static class IGameOptionsExtensions_GetAdjustedNumImpostors_Patch
         catch { return true; }
     }
 }
-
 [HarmonyPatch(typeof(FindAGameManager), nameof(FindAGameManager.Start))]
 public static class ExtendedLobbyListPatch
 {
     public static Scroller scroller;
-
     public static bool Prefix(FindAGameManager __instance)
     {
         if (!NjordMenuGUI.extendedLobby) return true;
@@ -4653,11 +4933,9 @@ public static class ExtendedLobbyListPatch
         {
             if (__instance.gameContainers == null || __instance.gameContainers.Count == 0) return true;
             if (__instance.gameContainers.Count > 10) return true;
-
             GameContainer prefab = __instance.gameContainers[0];
             GameObject holder = new GameObject("ExtendedLobbyScroller");
             holder.transform.SetParent(prefab.transform.parent);
-
             scroller = holder.AddComponent<Scroller>();
             scroller.Inner = holder.transform;
             scroller.MouseMustBeOverToScroll = true;
@@ -4665,11 +4943,9 @@ public static class ExtendedLobbyListPatch
             scroller.ScrollWheelSpeed = 0.4f;
             scroller.SetYBoundsMin(0f);
             scroller.SetYBoundsMax(4f);
-
             BoxCollider2D collider = prefab.transform.parent.gameObject.AddComponent<BoxCollider2D>();
             collider.size = new Vector2(100f, 100f);
             scroller.ClickMask = collider;
-
             var list = new System.Collections.Generic.List<GameContainer>();
             foreach (var gc in __instance.gameContainers)
             {
@@ -4677,21 +4953,18 @@ public static class ExtendedLobbyListPatch
                 gc.transform.localPosition = new Vector3(gc.transform.localPosition.x, gc.transform.localPosition.y, 25f);
                 list.Add(gc);
             }
-
             for (int i = 0; i < 15; i++)
             {
                 GameContainer newGc = UnityEngine.Object.Instantiate<GameContainer>(prefab, holder.transform);
                 newGc.transform.localPosition = new Vector3(newGc.transform.localPosition.x, newGc.transform.localPosition.y - 0.75f * list.Count, 25f);
                 list.Add(newGc);
             }
-
             __instance.gameContainers = new Il2CppReferenceArray<GameContainer>(list.ToArray());
             return true;
         }
         catch { return true; }
     }
 }
-
 [HarmonyPatch(typeof(FindAGameManager), nameof(FindAGameManager.RefreshList))]
 public static class ExtendedLobbyRefreshPatch
 {
@@ -4700,8 +4973,6 @@ public static class ExtendedLobbyRefreshPatch
         try { if (NjordMenuGUI.extendedLobby && ExtendedLobbyListPatch.scroller != null) ExtendedLobbyListPatch.scroller.ScrollRelative(new Vector2(0f, -100f)); } catch { }
     }
 }
-
-
 [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.FixedUpdate))]
 public static class InvertControls_Patch
 {
@@ -4733,7 +5004,6 @@ public static class InvertControls_Patch
             }
             return;
         }
-
         if (player.myPlayer.inVent && player.NetId != PlayerControl.LocalPlayer.MyPhysics.NetId)
         {
             player.myPlayer.Visible = true;
@@ -4751,14 +5021,12 @@ public static class InvertControls_Patch
             player.myPlayer.invisibilityAlpha = 1;
         }
     }
-
     public static void Postfix(PlayerPhysics __instance)
     {
         if (__instance.AmOwner && NjordMenuGUI.invertControls && __instance.body != null)
         {
             __instance.body.velocity = -__instance.body.velocity;
         }
-
         SeePlayerVent(__instance);
         }
     }
@@ -4776,7 +5044,6 @@ public static class InvertControls_Patch
             }
         }
     }
-}
 [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.HandleRpc))]
 public static class RPCSniffer_Patch
 {
@@ -4786,7 +5053,6 @@ public static class RPCSniffer_Patch
             22, 23, 24, 25, 26, 27, 29, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
             43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 60, 61, 62, 63, 64, 65
         };
-
     private static readonly Dictionary<byte, (string Name, string Color)> KnownMods = new Dictionary<byte, (string, string)>
         {
             { 157, ("RockStar", "#800000") },
@@ -4824,22 +5090,15 @@ public static class RPCSniffer_Patch
             { 133, ("Lunar / NjordMenu", "#00FFFF") },
             { 89,  ("Njord Menu Old", "#008000") }
         };
-
     public static bool Prefix(PlayerControl __instance, byte callId, MessageReader reader)
     {
         if (__instance == null) return true;
-
-       
         if (PlayerControl.LocalPlayer != null && __instance == PlayerControl.LocalPlayer) return true;
-
         if (NjordMenuGUI.LogAllRPCs)
         {
-            
             if (!VanillaRPCs.Contains(callId))
             {
                 string pNameSniff = (__instance.Data != null && !string.IsNullOrEmpty(__instance.Data.PlayerName)) ? __instance.Data.PlayerName : $"Player_{__instance.PlayerId}";
-
-                
                 if (KnownMods.TryGetValue(callId, out var modInfo))
                 {
                     NjordMenuGUI.ShowNotification($"<color=#00FFFF>[СНИФФЕР]</color> <b>{pNameSniff}</b>: <b><color={modInfo.Color}>{modInfo.Name}</color></b> <color=#FFFF00>({callId})</color>");
@@ -4853,15 +5112,12 @@ public static class RPCSniffer_Patch
         return true;
     }
 }
-
-
 [HarmonyPatch(typeof(HatManager), nameof(HatManager.Initialize))]
 public static class UnlockCosmetics_HatManager_Initialize_Postfix
 {
     public static void Postfix(HatManager __instance)
     {
         if (!NjordMenuGUI.unlockCosmetics) return;
-
         foreach (var bundle in __instance.allBundles) bundle.Free = true;
         foreach (var hat in __instance.allHats) hat.Free = true;
         foreach (var nameplate in __instance.allNamePlates) nameplate.Free = true;
@@ -4871,7 +5127,6 @@ public static class UnlockCosmetics_HatManager_Initialize_Postfix
         foreach (var starBundle in __instance.allStarBundles) starBundle.price = 0;
     }
 }
-
 [HarmonyPatch(typeof(PlayerPurchasesData), nameof(PlayerPurchasesData.GetPurchase))]
 public static class UnlockCosmetics_PlayerPurchasesData_GetPurchase_Prefix
 {
@@ -4882,20 +5137,108 @@ public static class UnlockCosmetics_PlayerPurchasesData_GetPurchase_Prefix
         return false;
     }
 }
-
+[HarmonyPatch(typeof(ChatController), nameof(ChatController.AddChat))]
+public static class ChatController_AddChat_Patch
+{
+    public static bool Prefix(PlayerControl sourcePlayer, ref string chatText, ChatController __instance)
+    {
+        if (string.IsNullOrEmpty(chatText)) return true;
+        string lowerText = chatText.ToLower().Trim();
+        if (NjordMenuGUI.enableColorCommand && sourcePlayer != null)
+        {
+            string[] colorCommands = { "/color ", "!color ", "/col ", "!col ", "/c ", "!c " };
+            string usedCmd = colorCommands.FirstOrDefault(cmd => lowerText.StartsWith(cmd));
+            if (usedCmd != null)
+            {
+                if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+                {
+                    string colorInput = lowerText.Substring(usedCmd.Length).Trim();
+                    int colorId = -1;
+                    if (int.TryParse(colorInput, out int parsedId)) { if (parsedId >= 0 && parsedId <= 18) colorId = parsedId; }
+                    else colorId = NjordMenuGUI.GetColorIdByName(colorInput);
+                    if (colorId != -1)
+                    {
+                        if (colorId == 18 && NjordMenuGUI.blockFortegreenChat)
+                        {
+                            if (HudManager.Instance?.Chat != null)
+                                HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Цвет Fortegreen запрещен хостом!");
+                        }
+                        else
+                        {
+                            sourcePlayer.RpcSetColor((byte)colorId);
+                        }
+                    }
+                    else if (sourcePlayer == PlayerControl.LocalPlayer)
+                    {
+                        __instance.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Неверный цвет.");
+                    }
+                }
+                return false;
+            }
+            if (lowerText == "/rainbow" || lowerText == "!rainbow" || lowerText == "/lgbt" || lowerText == "!lgbt")
+            {
+                if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+                {
+                    if (NjordMenuGUI.blockRainbowChat)
+                    {
+                        if (HudManager.Instance?.Chat != null)
+                            HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Радуга запрещена хостом!");
+                    }
+                    else
+                    {
+                        if (NjordMenuGUI.rainbowPlayers.Contains(sourcePlayer.PlayerId))
+                        {
+                            NjordMenuGUI.rainbowPlayers.Remove(sourcePlayer.PlayerId);
+                            NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВЫКЛ.");
+                        }
+                        else
+                        {
+                            NjordMenuGUI.rainbowPlayers.Add(sourcePlayer.PlayerId);
+                            NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВКЛ.");
+                        }
+                    }
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+    public static void Postfix(GameStartManager __instance)
+    {
+        if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || PlayerControl.LocalPlayer == null) return;
+        if (NjordMenuGUI.customStartTimer > 0f) return;
+        if (NjordMenuGUI.fakeStartCounterTroll)
+        {
+            try
+            {
+                sbyte[] arr = { -123, -100, -69, -42, 0, 42, 69, 100, 123 };
+                sbyte b = arr[UnityEngine.Random.Range(0, arr.Length)];
+                PlayerControl.LocalPlayer.RpcSetStartCounter((int)b);
+                __instance.SetStartCounter(b);
+            }
+            catch { }
+        }
+        else if (NjordMenuGUI.fakeStartCounterCustom && int.TryParse(NjordMenuGUI.fakeStartInput, out int custom))
+        {
+            try
+            {
+                PlayerControl.LocalPlayer.RpcSetStartCounter(custom);
+                __instance.SetStartCounter((sbyte)Mathf.Clamp(custom, -128, 127));
+            }
+            catch { }
+        }
+    }
+}
 [HarmonyPatch(typeof(GameContainer), nameof(GameContainer.SetupGameInfo))]
 public static class MoreLobbyInfo_GameContainer_SetupGameInfo_Postfix
 {
     public static void Postfix(GameContainer __instance)
     {
         if (!NjordMenuGUI.moreLobbyInfo) return;
-
         var trueHostName = __instance.gameListing.TrueHostName;
         const string separator = "<#0000>000000000000000</color>";
         var age = __instance.gameListing.Age;
         var lobbyTime = $"Age: {age / 60}:{(age % 60 < 10 ? "0" : "")}{age % 60}";
-
-        
         int platId = (int)__instance.gameListing.Platform;
         string platformStr = platId switch
         {
@@ -4912,22 +5255,18 @@ public static class MoreLobbyInfo_GameContainer_SetupGameInfo_Postfix
             112 => "Starlight",
             _ => "Unknown"
         };
-
         string hexColor = ColorUtility.ToHtmlStringRGB(NjordMenuGUI.currentAccentColor);
-
         __instance.capacity.text = $"<size=40%>{separator}\n{trueHostName}\n{__instance.capacity.text}\n" +
                                    $"<color=#{hexColor}>{GameCode.IntToGameName(__instance.gameListing.GameId)}</color>\n" +
                                    $"<color=#{hexColor}>{platformStr}</color>\n{lobbyTime}\n{separator}</size>";
     }
 }
-
 [HarmonyPatch(typeof(FindAGameManager), nameof(FindAGameManager.HandleList))]
 public static class MoreLobbyInfo_FindAGameManager_HandleList_Postfix
 {
     public static void Postfix(HttpMatchmakerManager.FindGamesListFilteredResponse response, FindAGameManager __instance)
     {
         if (!NjordMenuGUI.moreLobbyInfo) return;
-
         __instance.TotalText.text = response.Metadata.AllGamesCount.ToString();
     }
 }
@@ -4944,7 +5283,7 @@ public static class PlatformSpooferPatch
                 {
                     __instance.Platform = NjordMenuGUI.platformValues[NjordMenuGUI.currentPlatformIndex];
                 }
-                __instance.PlatformName = "NjordMenu by Meowchelo https://github.com/meowchelo/NjordMenu";
+                __instance.PlatformName = "NjordMenu by Meowchelo (and one <color=#FFA500>silly</color> guy :p) https://github.com/meowchelo/NjordMenu";
             }
         }
         catch { }
@@ -4965,14 +5304,12 @@ public static class AmongUsClient_KickPlayer_BanList_Patch
                     string fc = string.IsNullOrEmpty(pc.Data.FriendCode) ? "Unknown" : pc.Data.FriendCode;
                     string name = pc.Data.PlayerName ?? "Unknown";
                     string puid = "Unknown";
-
                     try
                     {
                         var client = AmongUsClient.Instance.GetClientFromCharacter(pc);
                         if (client != null) puid = client.Id.ToString();
                     }
                     catch { }
-
                     NjordMenuGUI.AddToBanList(fc, puid, name, "Host ban");
                     NjordMenuGUI.ShowNotification($"<color=#FF0000>[BAN]</color> {name} занесен в черный список!");
                 }
