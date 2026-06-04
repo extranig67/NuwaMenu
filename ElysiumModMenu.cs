@@ -14,7 +14,7 @@ using Il2CppInterop.Runtime.Attributes;
 using Il2CppInterop.Runtime.Injection;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using InnerNet;
-using NjordMenu;
+using ElysiumModMenu;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -27,19 +27,19 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.Events;
 using UnityEngine.Playables;
 using UnityEngine.UI;
-using static NjordMenu.NjordMenuGUI;
+using static ElysiumModMenu.ElysiumModMenuGUI;
 using static Rewired.UI.ControlMapper.ControlMapper;
 using Color = UnityEngine.Color;
 using Object = UnityEngine.Object;
 using Vector3 = UnityEngine.Vector3;
 using System.Runtime.CompilerServices;
-namespace NjordMenu
+namespace ElysiumModMenu
 {
-    [BepInPlugin("com.njord.menu", "NjordMenu", "1.2.7")]
+    [BepInPlugin("com.elysiummodmenu.menu", "ElysiumModMenu", "1.3.0")]
     public class Plugin : BasePlugin
     {
         public static Plugin Instance { get; private set; } = null!;
-        public static string NjordFolder = "";
+        public static string ElysiumFolder = "";
         public static ConfigFile MenuConfig;
         public static ConfigEntry<float> RpcSpoofDelayConfig;
         public static ConfigEntry<KeyCode> MenuKeybind;
@@ -59,47 +59,47 @@ namespace NjordMenu
         {
             Instance = this;
 
-            NjordFolder = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "NjordMenu");
-            if (!System.IO.Directory.Exists(NjordFolder))
+            ElysiumFolder = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "ElysiumModMenu");
+            if (!System.IO.Directory.Exists(ElysiumFolder))
             {
-                System.IO.Directory.CreateDirectory(NjordFolder);
+                System.IO.Directory.CreateDirectory(ElysiumFolder);
             }
 
-            string banFile = System.IO.Path.Combine(NjordFolder, "NjordMenuBanList.txt");
+            string banFile = System.IO.Path.Combine(ElysiumFolder, "ElysiumModMenuBanList.txt");
             if (!System.IO.File.Exists(banFile))
             {
                 System.IO.File.Create(banFile).Dispose();
             }
 
-            MenuConfig = new ConfigFile(System.IO.Path.Combine(NjordFolder, "NjordMenu.cfg"), true);
-            RpcSpoofDelayConfig = MenuConfig.Bind("NjordMenu.Spoofing", "RpcDelay", 4f, "");
-            MenuKeybind = MenuConfig.Bind("NjordMenu.GUI", "Keybind", KeyCode.Insert, "");
-            SpoofedLevel = MenuConfig.Bind("NjordMenu.Spoofing", "Level", "100", "");
-            EnableFriendCodeSpoofConfig = MenuConfig.Bind("NjordMenu.Spoofing", "EnableFriendCodeSpoof", false, "");
-            SpoofFriendCodeConfig = MenuConfig.Bind("NjordMenu.Spoofing", "FriendCode", "crewmate01", "");
-            EnablePlatformSpoof = MenuConfig.Bind("NjordMenu.Spoofing", "EnablePlatformSpoof", true, "");
-            AutoBanBrokenFriendCodeConfig = MenuConfig.Bind("NjordMenu.Anticheat", "AutoBanBrokenFriendCode", false, "");
-            PlatformIndex = MenuConfig.Bind("NjordMenu.Spoofing", "PlatformIndex", 1, "");
-            ShowWatermarkConfig = MenuConfig.Bind("NjordMenu.GUI", "ShowWatermark", true, "");
-            MenuColorIndexConfig = MenuConfig.Bind("NjordMenu.GUI", "MenuColorIndex", 10, "");
-            RgbMenuModeConfig = MenuConfig.Bind("NjordMenu.GUI", "RgbMenuMode", false, "");
-            UnlockCosmeticsConfig = MenuConfig.Bind("NjordMenu.General", "UnlockCosmetics", true, "");
-            MoreLobbyInfoConfig = MenuConfig.Bind("NjordMenu.Visuals", "MoreLobbyInfo", true, "");
+            MenuConfig = new ConfigFile(System.IO.Path.Combine(ElysiumFolder, "ElysiumModMenu.cfg"), true);
+            RpcSpoofDelayConfig = MenuConfig.Bind("ElysiumModMenu.Spoofing", "RpcDelay", 4f, "");
+            MenuKeybind = MenuConfig.Bind("ElysiumModMenu.GUI", "Keybind", KeyCode.Insert, "");
+            SpoofedLevel = MenuConfig.Bind("ElysiumModMenu.Spoofing", "Level", "100", "");
+            EnableFriendCodeSpoofConfig = MenuConfig.Bind("ElysiumModMenu.Spoofing", "EnableFriendCodeSpoof", false, "");
+            SpoofFriendCodeConfig = MenuConfig.Bind("ElysiumModMenu.Spoofing", "FriendCode", "crewmate01", "");
+            EnablePlatformSpoof = MenuConfig.Bind("ElysiumModMenu.Spoofing", "EnablePlatformSpoof", true, "");
+            AutoBanBrokenFriendCodeConfig = MenuConfig.Bind("ElysiumModMenu.Anticheat", "AutoBanBrokenFriendCode", false, "");
+            PlatformIndex = MenuConfig.Bind("ElysiumModMenu.Spoofing", "PlatformIndex", 1, "");
+            ShowWatermarkConfig = MenuConfig.Bind("ElysiumModMenu.GUI", "ShowWatermark", true, "");
+            MenuColorIndexConfig = MenuConfig.Bind("ElysiumModMenu.GUI", "MenuColorIndex", 10, "");
+            RgbMenuModeConfig = MenuConfig.Bind("ElysiumModMenu.GUI", "RgbMenuMode", false, "");
+            UnlockCosmeticsConfig = MenuConfig.Bind("ElysiumModMenu.General", "UnlockCosmetics", true, "");
+            MoreLobbyInfoConfig = MenuConfig.Bind("ElysiumModMenu.Visuals", "MoreLobbyInfo", true, "");
 
-            ClassInjector.RegisterTypeInIl2Cpp<NjordMenuGUI>();
+            ClassInjector.RegisterTypeInIl2Cpp<ElysiumModMenuGUI>();
 
-            var guiObject = new GameObject("NjordMenu_Object");
+            var guiObject = new GameObject("ElysiumModMenu_Object");
             UnityEngine.Object.DontDestroyOnLoad(guiObject);
             guiObject.hideFlags = HideFlags.HideAndDontSave;
-            guiObject.AddComponent<NjordMenuGUI>();
+            guiObject.AddComponent<ElysiumModMenuGUI>();
 
-            var harmony = new Harmony("com.njord.harmony");
+            var harmony = new Harmony("com.elysiummodmenu.harmony");
             harmony.PatchAll();
         }
     }
-    public class NjordMenuGUI : MonoBehaviour
+    public class ElysiumModMenuGUI : MonoBehaviour
     {
-        public static string[] spoofMenuNames = { "NjordMenu", "HostGuard/TOH", "Polar", "BanMod", "Better Among Us", "Sicko Menu", "GNC", "KillNetwork (V1)", "KillNetwork (V2)", "KNM" };
+        public static string[] spoofMenuNames = { "ElysiumModMenu", "HostGuard/TOH", "Polar", "BanMod", "Better Among Us", "Sicko Menu", "GNC", "KillNetwork (V1)", "KillNetwork (V2)", "KNM" };
         public static byte[] spoofMenuRPCs = { 89, 176, 204, 212, 151, 164, 154, 85, 150, 162 };
         public static float rpcSpoofDelay = 4f;
 
@@ -224,7 +224,7 @@ namespace NjordMenu
         private bool wasShowMenu = false;
         private int currentMenuColorIndex = 10;
         private string[] menuColorNames = {
-            "Njord Blue", "Dark Forest", "Green", "Sea Green", "Mint", "Chartreuse",
+            "Elysium Blue", "Dark Forest", "Green", "Sea Green", "Mint", "Chartreuse",
             "Sun Yellow", "Marigold", "Old Gold",
             "Bright Amber", "Vivid Orange", "Dark Orange",
             "Blood Red",
@@ -248,14 +248,14 @@ namespace NjordMenu
             new Color32(20, 184, 166, 255), new Color32(249, 115, 22, 255), new Color32(244, 114, 182, 255), new Color32(59, 130, 246, 255),
             new Color32(245, 158, 11, 255), new Color32(16, 185, 129, 255), new Color32(51, 65, 85, 255), new Color32(196, 181, 253, 255)
         };
-      
+
         public static float autoChatEveryoneDelay = 2.5f;
         public static string customChatMessage = "test";
         public static bool customChatSpamEnabled = false;
         public static float customChatSpamDelay = 2.1f;
         public static bool customChatInputFocused = false;
         private float customChatSpamTimer = 0f;
-        
+
         public static float autoMeetingTimer = 0f;
         private string[] tabNames => new string[] { L("GENERAL", "ОБЩИЕ"), L("SELF", "ИГРОК"), L("VISUALS", "ВИЗУАЛ"), L("PLAYERS", "ИГРОКИ"), L("SABOTAGES", "САБОТАЖИ"), L("HOST ONLY", "ХОСТ"), L("OUTFITS", "ОДЕЖДА"), L("VOTEKICK", "КИК"), L("MENU", "МЕНЮ"), L("MAPS", "КАРТЫ"), L("ANIMATIONS", "АНИМАЦИИ") };
         public static float speedMultiplier = 1f;
@@ -281,7 +281,7 @@ namespace NjordMenu
                 isSkeldFlipped = value;
             }
         }
-      
+
         [HarmonyPatch(typeof(TextBoxTMP), nameof(TextBoxTMP.Start))]
         public static class AllowSymbols_TextBoxTMP_Start_Patch
         {
@@ -300,7 +300,7 @@ namespace NjordMenu
             {
                 if (__instance == null || __instance.freeChatField == null || __instance.freeChatField.textArea == null) return;
 
-                if (NjordMenuGUI.enableFastChat && __instance.timeSinceLastMessage < 0.9f)
+                if (ElysiumModMenuGUI.enableFastChat && __instance.timeSinceLastMessage < 0.9f)
                 {
                     __instance.timeSinceLastMessage = 0.9f;
                 }
@@ -309,7 +309,7 @@ namespace NjordMenu
                 __instance.freeChatField.textArea.AllowSymbols = true;
                 __instance.freeChatField.textArea.AllowEmail = true;
 
-                __instance.freeChatField.textArea.characterLimit = NjordMenuGUI.enableExtendedChat ? 120 : 100;
+                __instance.freeChatField.textArea.characterLimit = ElysiumModMenuGUI.enableExtendedChat ? 120 : 100;
             }
         }
         [HarmonyPatch(typeof(ChatController), nameof(ChatController.SendFreeChat))]
@@ -317,7 +317,7 @@ namespace NjordMenu
         {
             public static bool Prefix(ChatController __instance)
             {
-                if (!NjordMenuGUI.allowLinksAndSymbols) return true;
+                if (!ElysiumModMenuGUI.allowLinksAndSymbols) return true;
 
                 string text = __instance.freeChatField.Text;
 
@@ -338,7 +338,7 @@ namespace NjordMenu
         {
             public static void Postfix(PlayerControl __instance, byte bodyColor)
             {
-                if (!NjordMenuGUI.autoKickBugs || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                if (!ElysiumModMenuGUI.autoKickBugs || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
 
                 try
                 {
@@ -349,16 +349,16 @@ namespace NjordMenu
 
                         if (bodyColor == 18 || colorName == "???" || bodyColor >= Palette.PlayerColors.Length)
                         {
-                            if (!NjordMenuGUI.fortegreenTimer.ContainsKey(pid))
+                            if (!ElysiumModMenuGUI.fortegreenTimer.ContainsKey(pid))
                             {
-                                NjordMenuGUI.fortegreenTimer[pid] = Time.time + NjordMenuGUI.autoKickTimer;
+                                ElysiumModMenuGUI.fortegreenTimer[pid] = Time.time + ElysiumModMenuGUI.autoKickTimer;
                             }
                         }
                         else
                         {
-                            if (NjordMenuGUI.fortegreenTimer.ContainsKey(pid))
+                            if (ElysiumModMenuGUI.fortegreenTimer.ContainsKey(pid))
                             {
-                                NjordMenuGUI.fortegreenTimer.Remove(pid);
+                                ElysiumModMenuGUI.fortegreenTimer.Remove(pid);
                             }
                         }
                     }
@@ -372,7 +372,7 @@ namespace NjordMenu
         {
             public static bool Prefix(VoteBanSystem __instance, byte callId, Hazel.MessageReader reader)
             {
-                if (!AmongUsClient.Instance.AmHost || !NjordMenuGUI.disableVoteKicks)
+                if (!AmongUsClient.Instance.AmHost || !ElysiumModMenuGUI.disableVoteKicks)
                     return true;
 
                 if (callId == 26)
@@ -380,7 +380,7 @@ namespace NjordMenu
                     reader.ReadInt32();
                     reader.ReadInt32();
 
-                    NjordMenuGUI.ShowNotification("<color=#FFAC1C>[SHIELD]</color> Заблокирована попытка Vote-Kick'а!");
+                    ElysiumModMenuGUI.ShowNotification("<color=#FFAC1C>[SHIELD]</color> Заблокирована попытка Vote-Kick'а!");
 
                     return false;
                 }
@@ -389,14 +389,14 @@ namespace NjordMenu
             }
         }
         public static bool disableVoteKicks = false;
-      
+
 
         [HarmonyPatch(typeof(ShhhBehaviour), nameof(ShhhBehaviour.PlayAnimation))]
         public static class SkipShhh_Perfect_Patch
         {
             public static bool Prefix(ShhhBehaviour __instance, ref Il2CppSystem.Collections.IEnumerator __result)
             {
-                if (!NjordMenuGUI.skipShhhAnim || __instance == null) return true;
+                if (!ElysiumModMenuGUI.skipShhhAnim || __instance == null) return true;
 
                 __instance.gameObject.SetActive(false);
 
@@ -774,7 +774,10 @@ namespace NjordMenu
                 }
                 else if (customChatInputFocused && e.type == EventType.KeyDown)
                 {
-                    if (e.keyCode == KeyCode.Backspace)
+                    if (HandleClipboardShortcut(e, ref customChatMessage, 120))
+                    {
+                    }
+                    else if (e.keyCode == KeyCode.Backspace)
                     {
                         if (!string.IsNullOrEmpty(customChatMessage))
                             customChatMessage = customChatMessage.Substring(0, customChatMessage.Length - 1);
@@ -892,7 +895,7 @@ namespace NjordMenu
             {
                 if (pc == null || pc.Data == null || pc.Data.Disconnected) return;
                 string name = string.IsNullOrEmpty(pc.Data.PlayerName) ? "Unknown" : pc.Data.PlayerName;
-                string fc = string.IsNullOrEmpty(pc.Data.FriendCode) ? "Hidden" : pc.Data.FriendCode;
+                string fc = GetDisplayedFriendCode(pc.Data);
                 string puid = "Unknown";
                 string platform = "Unknown";
                 int level = 1;
@@ -1082,9 +1085,9 @@ namespace NjordMenu
 
             GUILayout.BeginHorizontal();
             string defaultBanText = L("Enter Friend Code", "Введите Friend Code");
-            string banDisp = isEditingBan ? banInput + "_" : (string.IsNullOrEmpty(banInput) ? defaultBanText : banInput);
+            string banValue = string.IsNullOrEmpty(banInput) && !isEditingBan ? defaultBanText : banInput;
 
-            if (GUILayout.Button(banDisp, isEditingBan ? activeTabStyle : inputBlockStyle, GUILayout.ExpandWidth(true), GUILayout.Height(25f)))
+            if (DrawPseudoInputButton(banValue, isEditingBan, 25f, 46))
             {
                 isEditingBan = !isEditingBan;
                 ResetAllBindWaits();
@@ -1141,7 +1144,7 @@ namespace NjordMenu
             GUILayout.EndHorizontal();
         }
 
-        public static class NjordAnticheat
+        public static class ElysiumAnticheat
         {
             public static void Flag(PlayerControl player, string reason)
             {
@@ -1149,11 +1152,11 @@ namespace NjordMenu
 
                 string pName = player.Data.PlayerName ?? "Unknown";
 
-                int mode = NjordMenuGUI.punishmentMode;
+                int mode = ElysiumModMenuGUI.punishmentMode;
 
                 if (mode >= 1)
                 {
-                    NjordMenuGUI.ShowNotification($"<color=#FF0000>[ANTICHEAT]</color> <b>{pName}</b>: {reason}");
+                    ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[ANTICHEAT]</color> <b>{pName}</b>: {reason}");
                     System.Console.WriteLine($"[Anticheat] {pName} flagged for: {reason}");
                 }
 
@@ -1174,7 +1177,7 @@ namespace NjordMenu
                         }
                         catch { }
 
-                        NjordMenuGUI.AddToBanList(fc, puid, pName, $"Anticheat: {reason}");
+                        ElysiumModMenuGUI.AddToBanList(fc, puid, pName, $"Anticheat: {reason}");
 
                         AmongUsClient.Instance.KickPlayer(player.OwnerId, true);
                     }
@@ -1216,11 +1219,11 @@ namespace NjordMenu
 
             public static bool Prefix(PlayerControl __instance, byte callId, Hazel.MessageReader reader)
             {
-                if (!NjordMenuGUI.blockSpoofRPC &&
-                    !NjordMenuGUI.blockSabotageRPC &&
-                    !NjordMenuGUI.blockGameRpcInLobby &&
-                    !NjordMenuGUI.blockChatFloodRpc &&
-                    !NjordMenuGUI.blockMeetingFloodRpc) return true;
+                if (!ElysiumModMenuGUI.blockSpoofRPC &&
+                    !ElysiumModMenuGUI.blockSabotageRPC &&
+                    !ElysiumModMenuGUI.blockGameRpcInLobby &&
+                    !ElysiumModMenuGUI.blockChatFloodRpc &&
+                    !ElysiumModMenuGUI.blockMeetingFloodRpc) return true;
                 if (__instance == null || __instance == PlayerControl.LocalPlayer || __instance.Data == null) return true;
 
                 int oldPos = reader.Position;
@@ -1229,7 +1232,7 @@ namespace NjordMenu
 
                 try
                 {
-                    if (NjordMenuGUI.blockGameRpcInLobby &&
+                    if (ElysiumModMenuGUI.blockGameRpcInLobby &&
                         AmongUsClient.Instance != null &&
                         !AmongUsClient.Instance.IsGameStarted &&
                         lobbyGameRpcs.Contains(callId))
@@ -1238,27 +1241,27 @@ namespace NjordMenu
                         cheatReason = $"Game RPC in lobby ({((RpcCalls)callId)})";
                     }
 
-                    if (!isCheat && NjordMenuGUI.blockChatFloodRpc &&
+                    if (!isCheat && ElysiumModMenuGUI.blockChatFloodRpc &&
                         (callId == (byte)RpcCalls.SendChat || callId == (byte)RpcCalls.SendQuickChat))
                     {
-                        if (IsFlooded(chatRpcTimes, __instance.PlayerId, NjordMenuGUI.chatRpcLimit, NjordMenuGUI.chatRpcWindow))
+                        if (IsFlooded(chatRpcTimes, __instance.PlayerId, ElysiumModMenuGUI.chatRpcLimit, ElysiumModMenuGUI.chatRpcWindow))
                         {
                             isCheat = true;
                             cheatReason = "Chat RPC flood";
                         }
                     }
 
-                    if (!isCheat && NjordMenuGUI.blockMeetingFloodRpc &&
+                    if (!isCheat && ElysiumModMenuGUI.blockMeetingFloodRpc &&
                         (callId == (byte)RpcCalls.StartMeeting || callId == (byte)RpcCalls.ReportDeadBody))
                     {
-                        if (IsFlooded(meetingRpcTimes, __instance.PlayerId, NjordMenuGUI.meetingRpcLimit, NjordMenuGUI.meetingRpcWindow))
+                        if (IsFlooded(meetingRpcTimes, __instance.PlayerId, ElysiumModMenuGUI.meetingRpcLimit, ElysiumModMenuGUI.meetingRpcWindow))
                         {
                             isCheat = true;
                             cheatReason = "Meeting RPC flood";
                         }
                     }
 
-                    if (!isCheat && NjordMenuGUI.blockSpoofRPC)
+                    if (!isCheat && ElysiumModMenuGUI.blockSpoofRPC)
                     {
                         if (callId == (byte)RpcCalls.SetColor)
                         {
@@ -1295,7 +1298,7 @@ namespace NjordMenu
                         }
                     }
 
-                    if (!isCheat && NjordMenuGUI.blockSabotageRPC)
+                    if (!isCheat && ElysiumModMenuGUI.blockSabotageRPC)
                     {
                         if (callId == (byte)RpcCalls.ReportDeadBody)
                         {
@@ -1318,7 +1321,7 @@ namespace NjordMenu
 
                 if (isCheat)
                 {
-                    NjordAnticheat.Flag(__instance, cheatReason);
+                    ElysiumAnticheat.Flag(__instance, cheatReason);
                     return false;
                 }
 
@@ -1331,7 +1334,7 @@ namespace NjordMenu
         {
             public static bool Prefix(ShipStatus __instance, byte callId, Hazel.MessageReader reader)
             {
-                if (!NjordMenuGUI.blockSabotageRPC) return true;
+                if (!ElysiumModMenuGUI.blockSabotageRPC) return true;
 
                 int oldPos = reader.Position;
                 bool isCheat = false;
@@ -1367,7 +1370,7 @@ namespace NjordMenu
 
                 if (isCheat && sender != null && sender != PlayerControl.LocalPlayer)
                 {
-                    NjordAnticheat.Flag(sender, cheatReason);
+                    ElysiumAnticheat.Flag(sender, cheatReason);
                     return false;
                 }
 
@@ -1381,7 +1384,7 @@ namespace NjordMenu
         {
             public static void Postfix(PlayerControl __instance)
             {
-                if (!NjordMenuGUI.blockSpoofRPC || __instance == null || __instance == PlayerControl.LocalPlayer) return;
+                if (!ElysiumModMenuGUI.blockSpoofRPC || __instance == null || __instance == PlayerControl.LocalPlayer) return;
 
                 try
                 {
@@ -1421,13 +1424,13 @@ namespace NjordMenu
 
                     if (!isValid)
                     {
-                        NjordAnticheat.Flag(__instance, $"Platform Spoof detected ({platform.Platform})");
+                        ElysiumAnticheat.Flag(__instance, $"Platform Spoof detected ({platform.Platform})");
                     }
                 }
                 catch { }
             }
         }
-        public static class NjordAutoLobbyReturn
+        public static class ElysiumAutoLobbyReturn
         {
             private const float AutoReturnDelaySeconds = 3f;
             private const float AutoReturnRetrySeconds = 0.4f;
@@ -1502,7 +1505,7 @@ namespace NjordMenu
 
             private static bool ShouldAutoReturn()
             {
-                return NjordMenuGUI.AutoReturnLobbyAfterMatch || NjordAutoHostService.ShouldReturnAfterMatch;
+                return ElysiumModMenuGUI.AutoReturnLobbyAfterMatch || ElysiumAutoHostService.ShouldReturnAfterMatch;
             }
 
             private static bool TryInvokeEndGameAction(EndGameManager manager)
@@ -1644,7 +1647,7 @@ namespace NjordMenu
             }
         }
 
-        public static class NjordAutoHostService
+        public static class ElysiumAutoHostService
         {
             public sealed class AutoHostStatusSnapshot
             {
@@ -1767,7 +1770,7 @@ namespace NjordMenu
                     LobbyLifeRemainingSeconds = LobbyLifeRemaining,
                     AutoReturnAfterMatch = ShouldReturnAfterMatch,
                     ForceLastMinute = ForceLastMinuteEnabled,
-                    StartMode = NjordMenuGUI.AutoHostInstantStart ? "Мгновенный" : "Обычный",
+                    StartMode = ElysiumModMenuGUI.AutoHostInstantStart ? "Мгновенный" : "Обычный",
                     EffectiveStartDelaySeconds = EffectiveStartDelay(0),
                     WarmupRemainingSeconds = WarmupRemaining,
                     LoadGraceRemainingSeconds = LoadGraceRemaining,
@@ -1834,7 +1837,7 @@ namespace NjordMenu
                     return;
                 }
 
-                bool waitingForLoad = NjordMenuGUI.AutoHostWaitLoadedPlayers && connectedPlayers > readyPlayers;
+                bool waitingForLoad = ElysiumModMenuGUI.AutoHostWaitLoadedPlayers && connectedPlayers > readyPlayers;
                 if (waitingForLoad && !forceStart && !CanBypassLoadWait(now, readyPlayers, connectedPlayers, loadingName))
                 {
                     countdownStartedAt = -1f;
@@ -1865,8 +1868,8 @@ namespace NjordMenu
                 }
 
                 int requiredPlayers = RequiredPlayers;
-                bool enoughPlayers = NjordMenuGUI.AutoHostWaitLoadedPlayers ? readyPlayers >= requiredPlayers : connectedPlayers >= requiredPlayers;
-                bool continueBelowMin = !NjordMenuGUI.AutoHostCancelBelowMin && countdownStartedAt >= 0f && connectedPlayers >= 2;
+                bool enoughPlayers = ElysiumModMenuGUI.AutoHostWaitLoadedPlayers ? readyPlayers >= requiredPlayers : connectedPlayers >= requiredPlayers;
+                bool continueBelowMin = !ElysiumModMenuGUI.AutoHostCancelBelowMin && countdownStartedAt >= 0f && connectedPlayers >= 2;
 
                 if (!forceStart && !enoughPlayers && !continueBelowMin)
                 {
@@ -1946,7 +1949,7 @@ namespace NjordMenu
                 try
                 {
                     manager.MinPlayers = 1;
-                    if (NjordMenuGUI.AutoHostInstantStart)
+                    if (ElysiumModMenuGUI.AutoHostInstantStart)
                     {
                         manager.startState = GameStartManager.StartingStates.Countdown;
                         manager.countDownTimer = 0f;
@@ -2058,7 +2061,7 @@ namespace NjordMenu
             private static bool CanBypassLoadWait(float now, int readyPlayers, int connectedPlayers, string loadingName)
             {
                 if (readyPlayers < RequiredPlayers) { loadWaitStartedAt = -1f; return false; }
-                int grace = Mathf.Clamp((int)NjordMenuGUI.AutoHostLoadGraceSeconds, 0, 90);
+                int grace = Mathf.Clamp((int)ElysiumModMenuGUI.AutoHostLoadGraceSeconds, 0, 90);
                 if (grace <= 0) { loadWaitStartedAt = -1f; return false; }
                 if (loadWaitStartedAt < 0f) loadWaitStartedAt = now;
                 if (now - loadWaitStartedAt < grace)
@@ -2078,7 +2081,7 @@ namespace NjordMenu
                     reason = "Форс-старт: лобби скоро закроется";
                     return true;
                 }
-                int forceAfterMinutes = Mathf.Clamp(NjordMenuGUI.AutoHostForceAfterMinutes, 0, 10);
+                int forceAfterMinutes = Mathf.Clamp(ElysiumModMenuGUI.AutoHostForceAfterMinutes, 0, 10);
                 if (forceAfterMinutes > 0 && connectedPlayers >= minPlayers && lobbyOpenedAt > 0f && Time.unscaledTime - lobbyOpenedAt >= forceAfterMinutes * 60f)
                 {
                     reason = $"Форс-старт: ожидание {forceAfterMinutes} мин";
@@ -2090,7 +2093,7 @@ namespace NjordMenu
 
             private static bool IsFastStartActive(int connectedPlayers)
             {
-                int threshold = Mathf.Clamp(NjordMenuGUI.AutoHostFastStartPlayers, 0, 15);
+                int threshold = Mathf.Clamp(ElysiumModMenuGUI.AutoHostFastStartPlayers, 0, 15);
                 return threshold > 0 && connectedPlayers >= threshold;
             }
 
@@ -2098,7 +2101,7 @@ namespace NjordMenu
             {
                 float delay = StartDelaySeconds;
                 if (IsFastStartActive(connectedPlayers))
-                    delay = Mathf.Min(delay, Mathf.Clamp(NjordMenuGUI.AutoHostFastStartDelaySeconds, 0, 60));
+                    delay = Mathf.Min(delay, Mathf.Clamp(ElysiumModMenuGUI.AutoHostFastStartDelaySeconds, 0, 60));
                 return delay;
             }
 
@@ -2111,11 +2114,11 @@ namespace NjordMenu
 
             private static void Notify(string title, string detail)
             {
-                if (!NjordMenuGUI.AutoHostNotifications) return;
+                if (!ElysiumModMenuGUI.AutoHostNotifications) return;
                 float now = Time.unscaledTime;
                 if (lastNotificationAt > 0f && now - lastNotificationAt < NotificationCooldownSeconds) return;
                 lastNotificationAt = now;
-                NjordMenuGUI.ShowNotification($"<color=#FF00FF>[{title}]</color> {detail}");
+                ElysiumModMenuGUI.ShowNotification($"<color=#FF00FF>[{title}]</color> {detail}");
             }
 
             private static string FormatState(AutoHostState value)
@@ -2143,18 +2146,18 @@ namespace NjordMenu
                 return clean.Length <= 18 ? clean : clean.Substring(0, 17) + "...";
             }
 
-            public static bool IsEnabled => NjordMenuGUI.AutoHostEnabled;
-            public static bool ShouldReturnAfterMatch => IsEnabled && NjordMenuGUI.AutoReturnLobbyAfterMatch;
-            private static bool ForceLastMinuteEnabled => NjordMenuGUI.AutoHostForceLastMinute;
-            private static int RequiredPlayers => Mathf.Clamp(NjordMenuGUI.AutoHostMinPlayers, 1, 15);
-            private static int ForceMinPlayers => Mathf.Clamp(NjordMenuGUI.AutoHostForceMinPlayers, 1, 15);
-            private static float StartDelaySeconds => Mathf.Clamp(NjordMenuGUI.AutoHostStartDelaySeconds, 0f, 180f);
-            private static float BackoffSeconds => Mathf.Clamp(NjordMenuGUI.AutoHostBackoffSeconds, 2f, 60f);
+            public static bool IsEnabled => ElysiumModMenuGUI.AutoHostEnabled;
+            public static bool ShouldReturnAfterMatch => IsEnabled && ElysiumModMenuGUI.AutoReturnLobbyAfterMatch;
+            private static bool ForceLastMinuteEnabled => ElysiumModMenuGUI.AutoHostForceLastMinute;
+            private static int RequiredPlayers => Mathf.Clamp(ElysiumModMenuGUI.AutoHostMinPlayers, 1, 15);
+            private static int ForceMinPlayers => Mathf.Clamp(ElysiumModMenuGUI.AutoHostForceMinPlayers, 1, 15);
+            private static float StartDelaySeconds => Mathf.Clamp(ElysiumModMenuGUI.AutoHostStartDelaySeconds, 0f, 180f);
+            private static float BackoffSeconds => Mathf.Clamp(ElysiumModMenuGUI.AutoHostBackoffSeconds, 2f, 60f);
             private static float CountdownRemaining => countdownStartedAt < 0f ? 0f : Mathf.Clamp((activeCountdownDelay >= 0f ? activeCountdownDelay : StartDelaySeconds) - (Time.unscaledTime - countdownStartedAt), 0f, StartDelaySeconds);
             private static float BackoffRemaining => backoffUntil < 0f ? 0f : Mathf.Clamp(backoffUntil - Time.unscaledTime, 0f, BackoffSeconds);
             private static float LobbyLifeRemaining => lobbyOpenedAt < 0f ? -1f : Mathf.Clamp(LobbyLifetimeSeconds - (Time.unscaledTime - lobbyOpenedAt), 0f, LobbyLifetimeSeconds);
-            private static float WarmupRemaining => lobbyOpenedAt < 0f ? 0f : Mathf.Clamp(NjordMenuGUI.AutoHostWarmupSeconds - (Time.unscaledTime - lobbyOpenedAt), 0f, 120f);
-            private static float LoadGraceRemaining => loadWaitStartedAt < 0f || NjordMenuGUI.AutoHostLoadGraceSeconds <= 0 ? 0f : Mathf.Clamp(NjordMenuGUI.AutoHostLoadGraceSeconds - (Time.unscaledTime - loadWaitStartedAt), 0f, 90f);
+            private static float WarmupRemaining => lobbyOpenedAt < 0f ? 0f : Mathf.Clamp(ElysiumModMenuGUI.AutoHostWarmupSeconds - (Time.unscaledTime - lobbyOpenedAt), 0f, 120f);
+            private static float LoadGraceRemaining => loadWaitStartedAt < 0f || ElysiumModMenuGUI.AutoHostLoadGraceSeconds <= 0 ? 0f : Mathf.Clamp(ElysiumModMenuGUI.AutoHostLoadGraceSeconds - (Time.unscaledTime - loadWaitStartedAt), 0f, 90f);
         }
         private int currentVisualsSubTab = 0;
         private string[] visualsSubTabs = { "IN-GAME" };
@@ -2178,12 +2181,19 @@ namespace NjordMenu
         public static string spoofLevelString = "100";
         public static string customNameInput = "хыхых";
         public static string spoofFriendCodeInput = "crewmate01";
+        public static string localFriendCodeInput = "Steam#Local";
         public static bool isEditingLevel = false;
         public static bool isEditingName = false;
         public static bool isEditingFriendCode = false;
+        public static bool isEditingLocalFriendCode = false;
+        public static bool enableLocalNameSpoof = false;
+        public static bool enableLocalFriendCodeSpoof = false;
         public static bool enableFriendCodeSpoof = false;
         public static bool enablePlatformSpoof = true;
         public static int currentPlatformIndex = 1;
+        private static float localNameRefreshTimer = 0f;
+        private static float localFriendCodeRefreshTimer = 0f;
+        private static string originalLocalFriendCode = null;
         private float brokenFcScanTimer = 0f;
         private static readonly HashSet<int> brokenFcPunishedOwners = new HashSet<int>();
 
@@ -2210,7 +2220,7 @@ namespace NjordMenu
 
 
 
-        public class NjordNotification
+        public class ElysiumNotification
         {
             public string title;
             public string message;
@@ -2218,7 +2228,7 @@ namespace NjordMenu
             public float lifetime;
             public bool HasExpired => lifetime > ttl;
 
-            public NjordNotification(string title, string message, float ttl)
+            public ElysiumNotification(string title, string message, float ttl)
             {
                 this.title = title;
                 this.message = message;
@@ -2237,7 +2247,7 @@ namespace NjordMenu
         {
             try
             {
-                banListPath = System.IO.Path.Combine(Plugin.NjordFolder, "NjordMenuBanList.txt");
+                banListPath = System.IO.Path.Combine(Plugin.ElysiumFolder, "ElysiumModMenuBanList.txt");
                 if (!System.IO.File.Exists(banListPath))
                 {
                     System.IO.File.Create(banListPath).Dispose();
@@ -2314,7 +2324,7 @@ namespace NjordMenu
         public static bool neverEndGame = false;
         public static void ShowNotification(string text)
         {
-            string title = "NjordMenu";
+            string title = "ElysiumModMenu";
             string msg = text;
 
             if (text.Contains("[") && text.Contains("]"))
@@ -2334,7 +2344,7 @@ namespace NjordMenu
         public static void SendNotification(string title, string message, float ttl = 3.5f)
         {
             if (!EnableCustomNotifs) return;
-            screenNotifications.Add(new NjordNotification(title, message, ttl));
+            screenNotifications.Add(new ElysiumNotification(title, message, ttl));
         }
 
 
@@ -2352,9 +2362,9 @@ namespace NjordMenu
 
         public static bool EnableCustomNotifs = true;
         public static Vector2 notificationBoxSize = new Vector2(260f, 65f);
-        public static List<NjordNotification> screenNotifications = new List<NjordNotification>();
+        public static List<ElysiumNotification> screenNotifications = new List<ElysiumNotification>();
 
-      
+
         private bool stylesInited = false;
         private GUIStyle windowStyle, btnStyle, activeTabStyle, headerStyle, boxStyle;
         private GUIStyle sidebarStyle, sidebarBtnStyle, activeSidebarBtnStyle, titleStyle;
@@ -2439,7 +2449,7 @@ namespace NjordMenu
             GUILayout.EndVertical();
         }
 
-    
+
         public static bool enableLocalPetSpamDrop = true;
         public static bool enableHostPetSpamBan = false;
         [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.HandleRpc))]
@@ -2451,7 +2461,7 @@ namespace NjordMenu
 
             public static bool Prefix(PlayerPhysics __instance, byte callId, Hazel.MessageReader reader)
             {
-                if (!NjordMenuGUI.enableLocalPetSpamDrop && !NjordMenuGUI.enableHostPetSpamBan) return true;
+                if (!ElysiumModMenuGUI.enableLocalPetSpamDrop && !ElysiumModMenuGUI.enableHostPetSpamBan) return true;
 
                 if (callId == 49 || callId == 50)
                 {
@@ -2465,7 +2475,7 @@ namespace NjordMenu
 
                         if (petSpamBlockedPlayers.Contains(pId))
                         {
-                            if (NjordMenuGUI.enableLocalPetSpamDrop) return false;
+                            if (ElysiumModMenuGUI.enableLocalPetSpamDrop) return false;
                         }
 
                         float now = UnityEngine.Time.time;
@@ -2486,12 +2496,12 @@ namespace NjordMenu
 
                             string pName = __instance.myPlayer.Data?.PlayerName ?? "Unknown";
 
-                            if (NjordMenuGUI.enableLocalPetSpamDrop)
+                            if (ElysiumModMenuGUI.enableLocalPetSpamDrop)
                             {
-                                NjordMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Игрок <b>{pName}</b> заблокирован за Pet Spam (Локально)!");
+                                ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Игрок <b>{pName}</b> заблокирован за Pet Spam (Локально)!");
                             }
 
-                            if (NjordMenuGUI.enableHostPetSpamBan && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+                            if (ElysiumModMenuGUI.enableHostPetSpamBan && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                             {
                                 string fc = string.IsNullOrEmpty(__instance.myPlayer.Data?.FriendCode) ? "Unknown" : __instance.myPlayer.Data.FriendCode;
                                 string puid = "Unknown";
@@ -2503,11 +2513,11 @@ namespace NjordMenu
                                 }
                                 catch { }
 
-                                NjordMenuGUI.AddToBanList(fc, puid, pName, "Auto-banned for Pet Spam");
+                                ElysiumModMenuGUI.AddToBanList(fc, puid, pName, "Auto-banned for Pet Spam");
 
                                 AmongUsClient.Instance.KickPlayer(__instance.myPlayer.OwnerId, true);
 
-                                NjordMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Игрок <b>{pName}</b> АВТОМАТИЧЕСКИ ЗАБАНЕН за спам петом!");
+                                ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Игрок <b>{pName}</b> АВТОМАТИЧЕСКИ ЗАБАНЕН за спам петом!");
                             }
 
                             return false;
@@ -2590,9 +2600,9 @@ namespace NjordMenu
                 }
             }
 
-           
+
             if (hasAnticheat) yield return new UnityEngine.WaitForSeconds(0.5f);
-          
+
             foreach (var pc in PlayerControl.AllPlayerControls)
             {
                 if (pc != null && pc.Data != null && !pc.Data.Disconnected)
@@ -2703,6 +2713,126 @@ namespace NjordMenu
             catch { }
         }
 
+        private static void ApplyLocalNameSelf(string newName, bool notify = true)
+        {
+            try
+            {
+                PlayerControl local = PlayerControl.LocalPlayer;
+                if (local == null)
+                {
+                    if (notify) ShowNotification("<color=#FF4444>[LOCAL NAME]</color> Local player not found.");
+                    return;
+                }
+
+                string renderName = BuildLocalNameRenderText(newName);
+
+                TryInvokeStringMethod(local, "SetName", renderName);
+
+                try
+                {
+                    if (local.cosmetics != null)
+                        local.cosmetics.SetName(renderName);
+                }
+                catch { }
+
+                TrySetPlayerNameObject(local.Data, renderName);
+                if (local.Data != null)
+                {
+                    TrySetPlayerNameObject(local.Data.DefaultOutfit, renderName);
+                    TrySetPlayerNameObject(local.CurrentOutfit, renderName);
+                }
+
+                if (notify)
+                    ShowNotification($"<color=#00FFAA>[LOCAL NAME]</color> {L("Applied locally:", "Локально применен:")} <b>{newName}</b>");
+            }
+            catch { }
+        }
+
+        private static void ApplyLocalFriendCodeSelf(string fakeFriendCode, bool notify = true)
+        {
+            try
+            {
+                PlayerControl local = PlayerControl.LocalPlayer;
+                if (local == null || local.Data == null)
+                {
+                    if (notify) ShowNotification("<color=#FF4444>[LOCAL FC]</color> Local player data not found.");
+                    return;
+                }
+
+                fakeFriendCode ??= string.Empty;
+                string current = local.Data.FriendCode ?? string.Empty;
+                if (originalLocalFriendCode == null && current != fakeFriendCode)
+                    originalLocalFriendCode = current;
+
+                TrySetStringMember(local.Data, "FriendCode", fakeFriendCode);
+
+                if (notify)
+                    ShowNotification($"<color=#00FFAA>[LOCAL FC]</color> {L("Applied locally:", "Локально применен:")} <b>{fakeFriendCode}</b>");
+            }
+            catch { }
+        }
+
+        private static void RestoreLocalFriendCodeSelf()
+        {
+            try
+            {
+                if (PlayerControl.LocalPlayer == null || PlayerControl.LocalPlayer.Data == null || originalLocalFriendCode == null) return;
+                TrySetStringMember(PlayerControl.LocalPlayer.Data, "FriendCode", originalLocalFriendCode);
+                originalLocalFriendCode = null;
+            }
+            catch { }
+        }
+
+        private static void TrySetPlayerNameObject(object target, string newName)
+        {
+            TrySetStringMember(target, "PlayerName", newName);
+        }
+
+        private static void TrySetStringMember(object target, string memberName, string value)
+        {
+            if (target == null || string.IsNullOrEmpty(memberName)) return;
+
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            Type type = target.GetType();
+
+            try
+            {
+                PropertyInfo property = type.GetProperty(memberName, flags);
+                if (property != null && property.CanWrite)
+                {
+                    property.SetValue(target, value, null);
+                    return;
+                }
+            }
+            catch { }
+
+            try
+            {
+                FieldInfo field = type.GetField(memberName, flags);
+                if (field != null) field.SetValue(target, value);
+            }
+            catch { }
+        }
+
+        private static void TryInvokeStringMethod(object target, string methodName, string value)
+        {
+            if (target == null) return;
+
+            try
+            {
+                MethodInfo method = target.GetType().GetMethod(
+                    methodName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    new[] { typeof(string) },
+                    null);
+
+                if (method != null)
+                    method.Invoke(target, new object[] { value });
+            }
+            catch { }
+        }
+
         public static bool showWatermark = true;
         public static bool whiteMenuTheme = false;
 
@@ -2737,6 +2867,9 @@ namespace NjordMenu
                 PlayerPrefs.SetInt("M_AutoKickBugs", autoKickBugs ? 1 : 0);
                 PlayerPrefs.SetFloat("M_AutoKickTimer", autoKickTimer);
                 PlayerPrefs.SetInt("M_DisableVoteKicks", disableVoteKicks ? 1 : 0);
+                PlayerPrefs.SetInt("M_LocalNameSpoof", enableLocalNameSpoof ? 1 : 0);
+                PlayerPrefs.SetInt("M_LocalFakeFCEnabled", enableLocalFriendCodeSpoof ? 1 : 0);
+                PlayerPrefs.SetString("M_LocalFakeFC", localFriendCodeInput);
 
                 if (keyBinds.ContainsKey("Toggle Menu"))
                     Plugin.MenuKeybind.Value = keyBinds["Toggle Menu"];
@@ -2753,7 +2886,7 @@ namespace NjordMenu
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label(L("AUTO HOST SYSTEM", "СИСТЕМА АВТО-ХОСТА"), headerStyle);
 
-            var snapshot = NjordAutoHostService.GetStatusSnapshot();
+            var snapshot = ElysiumAutoHostService.GetStatusSnapshot();
             GUILayout.Label($"<color=#aaaaaa>{L("Status:", "Статус:")}</color> <color=#FFAC1C>{snapshot.State}</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13 });
             GUILayout.Space(10);
 
@@ -2821,6 +2954,9 @@ namespace NjordMenu
                 if (PlayerPrefs.HasKey("M_AutoKickBugs")) autoKickBugs = PlayerPrefs.GetInt("M_AutoKickBugs") == 1;
                 if (PlayerPrefs.HasKey("M_AutoKickTimer")) autoKickTimer = PlayerPrefs.GetFloat("M_AutoKickTimer");
                 if (PlayerPrefs.HasKey("M_DisableVoteKicks")) disableVoteKicks = PlayerPrefs.GetInt("M_DisableVoteKicks") == 1;
+                if (PlayerPrefs.HasKey("M_LocalNameSpoof")) enableLocalNameSpoof = PlayerPrefs.GetInt("M_LocalNameSpoof") == 1;
+                if (PlayerPrefs.HasKey("M_LocalFakeFCEnabled")) enableLocalFriendCodeSpoof = PlayerPrefs.GetInt("M_LocalFakeFCEnabled") == 1;
+                if (PlayerPrefs.HasKey("M_LocalFakeFC")) localFriendCodeInput = PlayerPrefs.GetString("M_LocalFakeFC");
                 if (PlayerPrefs.HasKey("M_BndMagnet")) bindMagnetCursor = (KeyCode)PlayerPrefs.GetInt("M_BndMagnet");
                 if (PlayerPrefs.HasKey("M_MenuToggleKey")) menuToggleKey = (KeyCode)PlayerPrefs.GetInt("M_MenuToggleKey");
                 if (PlayerPrefs.HasKey("M_BndMMorph")) bindMassMorph = (KeyCode)PlayerPrefs.GetInt("M_BndMMorph");
@@ -3134,7 +3270,7 @@ namespace NjordMenu
             titleStyle.padding = CreateRectOffset(10, 0, 8, 0);
 
             Texture2D texScrollBg = MakeRoundedTex(8, new Color(0.1f, 0.1f, 0.1f, 0.2f), 4f);
-            texScrollThumb = MakeRoundedTex(8, accent, 4f); 
+            texScrollThumb = MakeRoundedTex(8, accent, 4f);
 
             GUIStyle scrollBarStyle = new GUIStyle(GUI.skin.verticalScrollbar);
             scrollBarStyle.normal.background = texScrollBg;
@@ -3165,8 +3301,8 @@ namespace NjordMenu
         {
             try
             {
-                string bgPath = System.IO.Path.Combine(Plugin.NjordFolder, "MenuBG.png");
-                if (!System.IO.File.Exists(bgPath)) bgPath = System.IO.Path.Combine(Plugin.NjordFolder, "MenuBG.jpg");
+                string bgPath = System.IO.Path.Combine(Plugin.ElysiumFolder, "MenuBG.png");
+                if (!System.IO.File.Exists(bgPath)) bgPath = System.IO.Path.Combine(Plugin.ElysiumFolder, "MenuBG.jpg");
                 if (System.IO.File.Exists(bgPath))
                 {
                     byte[] fileData = System.IO.File.ReadAllBytes(bgPath);
@@ -3261,7 +3397,7 @@ namespace NjordMenu
             GUILayout.BeginVertical(boxStyle);
             try
             {
-                GUILayout.Label("⌨️ CUSTOM KEYBINDS", headerStyle);
+                GUILayout.Label("?? CUSTOM KEYBINDS", headerStyle);
                 GUILayout.Space(10);
 
                 DrawKeybindRow("Magnet Cursor:", ref bindMagnetCursor, ref isWaitBindMagnetCursor);
@@ -3357,6 +3493,32 @@ namespace NjordMenu
             return GUILayout.Button(text, style, GUILayout.Width(width), GUILayout.Height(height));
         }
 
+        private bool DrawPseudoInputButton(string value, bool editing, float height = 28f, int maxChars = 52)
+        {
+            GUIStyle style = new GUIStyle(editing ? activeTabStyle : inputBlockStyle);
+            style.alignment = TextAnchor.MiddleLeft;
+            style.clipping = TextClipping.Clip;
+            style.wordWrap = false;
+            style.padding = CreateRectOffset(10, 10, 0, 0);
+
+            Rect rect = GUILayoutUtility.GetRect(GUIContent.none, style, GUILayout.ExpandWidth(true), GUILayout.Height(height));
+            return GUI.Button(rect, FormatInputPreview(value, editing, maxChars), style);
+        }
+
+        private void DrawClippedHint(string text, float height = 13f)
+        {
+            GUIStyle style = new GUIStyle(toggleLabelStyle)
+            {
+                fontSize = 10,
+                clipping = TextClipping.Clip,
+                wordWrap = false,
+                alignment = TextAnchor.MiddleLeft
+            };
+
+            Rect rect = GUILayoutUtility.GetRect(GUIContent.none, style, GUILayout.ExpandWidth(true), GUILayout.Height(height));
+            GUI.Label(rect, text, style);
+        }
+
         private void OpenExternalLink(string url, string label)
         {
             try
@@ -3373,7 +3535,7 @@ namespace NjordMenu
         private void DrawGeneralInfoTab()
         {
             GUILayout.BeginVertical(boxStyle);
-            GUILayout.Label("NJORD OVERVIEW", headerStyle);
+            GUILayout.Label("ELYSIUM OVERVIEW", headerStyle);
             GUILayout.Space(6);
 
             GUILayout.BeginHorizontal();
@@ -3395,7 +3557,7 @@ namespace NjordMenu
             string contributorHex = ColorUtility.ToHtmlStringRGB(whiteMenuTheme ? GetThemeAccentColor(new Color32(109, 138, 255, 255)) : new Color32(109, 138, 255, 255));
             string dangerHex = ColorUtility.ToHtmlStringRGB(whiteMenuTheme ? GetThemeAccentColor(new Color32(231, 76, 60, 255)) : new Color32(231, 76, 60, 255));
             string safeHex = ColorUtility.ToHtmlStringRGB(whiteMenuTheme ? GetThemeAccentColor(new Color32(57, 255, 20, 255)) : new Color32(57, 255, 20, 255));
-            string versionText = "1.2.7";
+            string versionText = "1.3.0";
 
             GUIStyle textStyle = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 12 };
             textStyle.normal.textColor = whiteMenuTheme ? new Color(0.16f, 0.16f, 0.16f, 1f) : new Color(0.85f, 0.85f, 0.85f, 1f);
@@ -3404,13 +3566,13 @@ namespace NjordMenu
             {
                 GUILayout.BeginVertical(boxStyle);
                 GUILayout.Label(
-                    $"{L("Welcome to", "Добро пожаловать в")} <b><color=#{accentHex}>NjordMenu</color></b> " +
+                    $"{L("Welcome to", "Добро пожаловать в")} <b><color=#{accentHex}>ElysiumModMenu</color></b> " +
                     $"<b><color=#{goldHex}>v{versionText}</color></b> {L("by", "от")} <b><color=#{leadHex}>meowchelo</color></b>!",
                     textStyle);
                 GUILayout.Space(4);
                 GUILayout.Label(L(
-                    "NjordMenu is a lightweight BepInEx IL2CPP utility for Among Us with lobby tools, visuals, spoofing and host-side controls.",
-                    "NjordMenu это легкий BepInEx IL2CPP мод для Among Us с инструментами для лобби, визуалом, спуфингом и хост-функциями."), textStyle);
+                    "ElysiumModMenu is a lightweight BepInEx IL2CPP utility for Among Us with lobby tools, visuals, spoofing and host-side controls.",
+                    "ElysiumModMenu это легкий BepInEx IL2CPP мод для Among Us с инструментами для лобби, визуалом, спуфингом и хост-функциями."), textStyle);
                 GUILayout.Label(L(
                     "Use the buttons below to open the GitHub repository or jump straight to the latest public release.",
                     "Кнопки ниже открывают GitHub репозиторий и страницу с последним публичным релизом."), textStyle);
@@ -3418,17 +3580,17 @@ namespace NjordMenu
 
                 GUILayout.BeginHorizontal();
                 if (DrawColoredActionButton("GitHub", new Color32(26, 188, 156, 255), 110f))
-                    OpenExternalLink("https://github.com/meowchelo/NjordMenu", "GitHub");
+                    OpenExternalLink("https://github.com/meowchelo/ElysiumModMenu", "GitHub");
                 GUILayout.Space(6);
                 if (DrawColoredActionButton("Check for Updates", new Color32(255, 187, 54, 255), 165f))
-                    OpenExternalLink("https://github.com/meowchelo/NjordMenu/releases/latest", "Latest Release");
+                    OpenExternalLink("https://github.com/meowchelo/ElysiumModMenu/releases/latest", "Latest Release");
                 GUILayout.EndHorizontal();
 
                 GUILayout.Space(8);
-                GUILayout.Label($"{L("Project", "Проект")}: <b><color=#{githubHex}>meowchelo/NjordMenu</color></b>", textStyle);
-                GUILayout.Label($"{L("Main page", "Главная ссылка")}: <color=#{githubHex}>https://github.com/meowchelo/NjordMenu</color>", textStyle);
+                GUILayout.Label($"{L("Project", "Проект")}: <b><color=#{githubHex}>meowchelo/ElysiumModMenu</color></b>", textStyle);
+                GUILayout.Label($"{L("Main page", "Главная ссылка")}: <color=#{githubHex}>https://github.com/meowchelo/ElysiumModMenu</color>", textStyle);
                 GUILayout.Space(8);
-                GUILayout.Label($"{L("NjordMenu is free and open-source software.", "NjordMenu это бесплатный open-source проект.")}", textStyle);
+                GUILayout.Label($"{L("ElysiumModMenu is free and open-source software.", "ElysiumModMenu это бесплатный open-source проект.")}", textStyle);
                 GUILayout.Label($"<b><color=#{dangerHex}>{L("If you paid for this menu, demand a refund immediately.", "Если вы заплатили за это меню, требуйте возврат денег сразу.")}</color></b>", textStyle);
                 GUILayout.Label($"<b><color=#{safeHex}>{L("Make sure you are using the latest version from GitHub releases.", "Убедитесь, что используете последнюю версию из GitHub releases.")}</color></b>", textStyle);
                 GUILayout.Space(8);
@@ -3442,8 +3604,8 @@ namespace NjordMenu
             {
                 GUILayout.BeginVertical(boxStyle);
                 GUILayout.Label(L(
-                    "NjordMenu is an open-source project. Meet the people behind this build:",
-                    "NjordMenu это open-source проект. Ниже люди, которые стоят за этой сборкой:"), textStyle);
+                    "ElysiumModMenu is an open-source project. Meet the people behind this build:",
+                    "ElysiumModMenu это open-source проект. Ниже люди, которые стоят за этой сборкой:"), textStyle);
                 GUILayout.Space(8);
 
                 GUILayout.Label($"<b><color=#{goldHex}>LEAD DEVELOPER</color></b>", textStyle);
@@ -3468,8 +3630,8 @@ namespace NjordMenu
                     "The public source, releases and project updates are published on GitHub.",
                     "Публичный исходный код, релизы и обновления проекта публикуются на GitHub."), textStyle);
                 GUILayout.Space(4);
-                if (DrawColoredActionButton("Open NjordMenu Repository", new Color32(26, 188, 156, 255), 220f))
-                    OpenExternalLink("https://github.com/meowchelo/NjordMenu", "NjordMenu Repository");
+                if (DrawColoredActionButton("Open ElysiumModMenu Repository", new Color32(26, 188, 156, 255), 220f))
+                    OpenExternalLink("https://github.com/meowchelo/ElysiumModMenu", "ElysiumModMenu Repository");
 
                 GUILayout.Space(10);
                 GUILayout.Label($"<b><color=#{contributorHex}>{L("Notes", "Примечание")}</color></b>", textStyle);
@@ -3487,7 +3649,7 @@ namespace NjordMenu
         {
             public static void Prefix(PlayerControl sourcePlayer, ref string chatText)
             {
-                if (!NjordMenuGUI.enableChatLog || string.IsNullOrWhiteSpace(chatText)) return;
+                if (!ElysiumModMenuGUI.enableChatLog || string.IsNullOrWhiteSpace(chatText)) return;
 
                 try
                 {
@@ -3506,13 +3668,13 @@ namespace NjordMenu
                         uint rawLevel = sourcePlayer.Data.PlayerLevel;
                         if (rawLevel != uint.MaxValue && rawLevel < 10000) levelStr = (rawLevel + 1).ToString();
 
-                        if (!string.IsNullOrEmpty(sourcePlayer.Data.FriendCode)) fc = sourcePlayer.Data.FriendCode;
+                        fc = GetDisplayedFriendCode(sourcePlayer.Data, "Hidden");
 
                         var client = AmongUsClient.Instance?.GetClientFromCharacter(sourcePlayer);
                         if (client != null)
                         {
                             puid = client.Id.ToString();
-                            platformStr = NjordMenuGUI.GetPlatform(client);
+                            platformStr = ElysiumModMenuGUI.GetPlatform(client);
                         }
                     }
 
@@ -3520,7 +3682,7 @@ namespace NjordMenu
 
                     string logLine = $"[{time}] [{name}] [Lv:{levelStr}] [FC:{fc}] [ID:{puid}] [{platformStr}] : {cleanText}\n";
 
-                    string chatLogPath = System.IO.Path.Combine(Plugin.NjordFolder, "ChatLog.txt");
+                    string chatLogPath = System.IO.Path.Combine(Plugin.ElysiumFolder, "ChatLog.txt");
                     System.IO.File.AppendAllText(chatLogPath, logLine);
                 }
                 catch { }
@@ -3730,7 +3892,10 @@ namespace NjordMenu
                 }
                 else if (customChatInputFocused && e.type == EventType.KeyDown)
                 {
-                    if (e.keyCode == KeyCode.Backspace)
+                    if (HandleClipboardShortcut(e, ref customChatMessage, 120))
+                    {
+                    }
+                    else if (e.keyCode == KeyCode.Backspace)
                     {
                         if (!string.IsNullOrEmpty(customChatMessage))
                             customChatMessage = customChatMessage.Substring(0, customChatMessage.Length - 1);
@@ -3862,6 +4027,122 @@ namespace NjordMenu
             return clean;
         }
 
+        private static string BuildLocalNameRenderText(string input)
+        {
+            string value = (input ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+            string trimmed = value.TrimStart();
+            if (trimmed.StartsWith("shimmer:", StringComparison.OrdinalIgnoreCase))
+                return ApplyMenuShimmer(trimmed.Substring("shimmer:".Length).TrimStart());
+
+            Match hexPrefix = Regex.Match(trimmed, @"^#([0-9A-Fa-f]{6})(.*)$");
+            if (hexPrefix.Success)
+            {
+                string payload = hexPrefix.Groups[2].Value.TrimStart(' ', ':', '|', '-', '>');
+                if (!string.IsNullOrEmpty(payload))
+                    return $"<color=#{hexPrefix.Groups[1].Value}>{payload}</color>";
+            }
+
+            return value;
+        }
+
+        private static string GetDisplayedFriendCode(NetworkedPlayerInfo data, string emptyValue = "Hidden")
+        {
+            if (data == null) return emptyValue;
+
+            string value = data.FriendCode;
+            if (enableLocalFriendCodeSpoof &&
+                PlayerControl.LocalPlayer != null &&
+                data.PlayerId == PlayerControl.LocalPlayer.PlayerId &&
+                !string.IsNullOrEmpty(localFriendCodeInput))
+            {
+                value = localFriendCodeInput;
+            }
+
+            return string.IsNullOrEmpty(value) ? emptyValue : value;
+        }
+
+        public static bool PrepareLocalFriendCodeForSerialize(NetworkedPlayerInfo data, out string restoreValue)
+        {
+            restoreValue = null;
+            try
+            {
+                if (!enableLocalFriendCodeSpoof || enableFriendCodeSpoof) return false;
+                if (data == null || PlayerControl.LocalPlayer == null || data.PlayerId != PlayerControl.LocalPlayer.PlayerId) return false;
+
+                restoreValue = data.FriendCode;
+                TrySetStringMember(data, "FriendCode", originalLocalFriendCode ?? string.Empty);
+                return true;
+            }
+            catch
+            {
+                restoreValue = null;
+                return false;
+            }
+        }
+
+        public static void RestoreLocalFriendCodeAfterSerialize(NetworkedPlayerInfo data, string restoreValue)
+        {
+            try
+            {
+                if (data == null || restoreValue == null) return;
+                TrySetStringMember(data, "FriendCode", restoreValue);
+            }
+            catch { }
+        }
+
+        private static string FormatInputPreview(string value, bool editing, int maxChars = 52)
+        {
+            string preview = value ?? string.Empty;
+            if (preview.Length > maxChars)
+                preview = "..." + preview.Substring(preview.Length - (maxChars - 3));
+
+            if (editing) preview += "_";
+            return string.IsNullOrEmpty(preview) ? " " : preview;
+        }
+
+        private static bool HandleClipboardShortcut(Event e, ref string target, int maxLength = -1)
+        {
+            if (e == null || e.type != EventType.KeyDown) return false;
+
+            bool ctrlOrCmd = e.control || e.command;
+            bool pasteAlt = e.shift && e.keyCode == KeyCode.Insert;
+            if (!ctrlOrCmd && !pasteAlt) return false;
+
+            target ??= string.Empty;
+
+            if (ctrlOrCmd && e.keyCode == KeyCode.C)
+            {
+                GUIUtility.systemCopyBuffer = target;
+                e.Use();
+                return true;
+            }
+
+            if (ctrlOrCmd && e.keyCode == KeyCode.X)
+            {
+                GUIUtility.systemCopyBuffer = target;
+                target = string.Empty;
+                e.Use();
+                return true;
+            }
+
+            if ((ctrlOrCmd && e.keyCode == KeyCode.V) || pasteAlt)
+            {
+                string paste = (GUIUtility.systemCopyBuffer ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+                if (paste.Length > 0)
+                {
+                    target += paste;
+                    if (maxLength >= 0 && target.Length > maxLength)
+                        target = target.Substring(0, maxLength);
+                }
+                e.Use();
+                return true;
+            }
+
+            return false;
+        }
+
         private static bool IsBrokenFriendCode(string friendCode)
         {
             if (string.IsNullOrWhiteSpace(friendCode)) return true;
@@ -3944,12 +4225,12 @@ namespace NjordMenu
             GUILayout.Label("LEVEL SPOOF", headerStyle);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Fake Level", btnStyle, GUILayout.Width(86), GUILayout.Height(28));
-            string lvlDisp = isEditingLevel ? spoofLevelString + "_" : spoofLevelString;
-            if (GUILayout.Button(lvlDisp, isEditingLevel ? activeTabStyle : inputBlockStyle, GUILayout.ExpandWidth(true), GUILayout.Height(28)))
+            if (DrawPseudoInputButton(spoofLevelString, isEditingLevel, 28f, 32))
             {
                 isEditingLevel = !isEditingLevel;
                 isEditingName = false;
                 isEditingFriendCode = false;
+                isEditingLocalFriendCode = false;
             }
             if (GUILayout.Button("Apply", btnStyle, GUILayout.Width(56), GUILayout.Height(28)))
             {
@@ -3967,16 +4248,79 @@ namespace NjordMenu
             GUILayout.Space(6);
 
             GUILayout.BeginVertical(boxStyle);
+            GUILayout.Label("LOCAL NAME SPOOF", headerStyle);
+            bool newLocalNameToggle = DrawToggle(enableLocalNameSpoof, "Keep Local Nick", 180);
+            if (newLocalNameToggle != enableLocalNameSpoof)
+            {
+                enableLocalNameSpoof = newLocalNameToggle;
+                if (enableLocalNameSpoof) ApplyLocalNameSelf(customNameInput, false);
+                SaveConfig();
+            }
+            GUILayout.Space(2);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Nick", btnStyle, GUILayout.Width(58), GUILayout.Height(28));
+            if (DrawPseudoInputButton(customNameInput, isEditingName, 28f, 54))
+            {
+                isEditingName = !isEditingName;
+                isEditingLevel = false;
+                isEditingFriendCode = false;
+                isEditingLocalFriendCode = false;
+            }
+            if (GUILayout.Button("Apply", btnStyle, GUILayout.Width(56), GUILayout.Height(28)))
+            {
+                isEditingName = false;
+                ApplyLocalNameSelf(customNameInput, true);
+                SaveConfig();
+            }
+            GUILayout.EndHorizontal();
+            DrawClippedHint("Local only: no RPC broadcast. Supports shimmer:Text, #68B6E7Text and raw rich text.");
+            GUILayout.EndVertical();
+
+            GUILayout.Space(6);
+
+            GUILayout.BeginVertical(boxStyle);
+            GUILayout.Label("LOCAL FAKE FRIEND CODE", headerStyle);
+            bool newLocalFcToggle = DrawToggle(enableLocalFriendCodeSpoof, "Keep Fake FC Local", 180);
+            if (newLocalFcToggle != enableLocalFriendCodeSpoof)
+            {
+                enableLocalFriendCodeSpoof = newLocalFcToggle;
+                if (enableLocalFriendCodeSpoof) ApplyLocalFriendCodeSelf(localFriendCodeInput, false);
+                else RestoreLocalFriendCodeSelf();
+                SaveConfig();
+            }
+            GUILayout.Space(2);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Fake FC", btnStyle, GUILayout.Width(58), GUILayout.Height(28));
+            if (DrawPseudoInputButton(localFriendCodeInput, isEditingLocalFriendCode, 28f, 54))
+            {
+                isEditingLocalFriendCode = !isEditingLocalFriendCode;
+                isEditingName = false;
+                isEditingLevel = false;
+                isEditingFriendCode = false;
+            }
+            if (GUILayout.Button("Apply", btnStyle, GUILayout.Width(56), GUILayout.Height(28)))
+            {
+                isEditingLocalFriendCode = false;
+                ApplyLocalFriendCodeSelf(localFriendCodeInput, true);
+                SaveConfig();
+            }
+            GUILayout.EndHorizontal();
+            DrawClippedHint("Local only: any text, any symbols. Used in this client UI only.");
+            GUILayout.EndVertical();
+
+            GUILayout.Space(6);
+
+            GUILayout.BeginVertical(boxStyle);
             GUILayout.Label("FRIEND CODE SPOOF", headerStyle);
             enableFriendCodeSpoof = DrawToggle(enableFriendCodeSpoof, "Enable FC Spoof", 180);
             GUILayout.Space(2);
             GUILayout.BeginHorizontal();
-            string fcDisp = isEditingFriendCode ? spoofFriendCodeInput + "_" : spoofFriendCodeInput;
-            if (GUILayout.Button(fcDisp, isEditingFriendCode ? activeTabStyle : inputBlockStyle, GUILayout.ExpandWidth(true), GUILayout.Height(28)))
+            if (DrawPseudoInputButton(spoofFriendCodeInput, isEditingFriendCode, 28f, 54))
             {
                 isEditingFriendCode = !isEditingFriendCode;
                 isEditingName = false;
                 isEditingLevel = false;
+                isEditingLocalFriendCode = false;
             }
             if (GUILayout.Button("Apply", btnStyle, GUILayout.Width(56), GUILayout.Height(28)))
             {
@@ -3985,7 +4329,7 @@ namespace NjordMenu
                 SaveConfig();
             }
             GUILayout.EndHorizontal();
-            GUILayout.Label("Guest-style code: <=10, [a-z0-9], no spaces", new GUIStyle(toggleLabelStyle) { fontSize = 10 });
+            DrawClippedHint("Guest-style code: <=10, [a-z0-9], no spaces");
             GUILayout.EndVertical();
 
             GUILayout.Space(6);
@@ -4020,7 +4364,7 @@ namespace NjordMenu
         }
 
 
-   
+
         private void DrawVisualsTab()
         {
             GUILayout.BeginHorizontal();
@@ -4032,14 +4376,14 @@ namespace NjordMenu
             if (currentVisualsSubTab == 0) DrawVisualsInGame();
         }
 
-    
+
 
         [HarmonyPatch(typeof(PlayerBanData), nameof(PlayerBanData.BanPoints), MethodType.Setter)]
         public static class RemoveDisconnectPenalty_Patch
         {
             public static bool Prefix(PlayerBanData __instance, ref float value)
             {
-                if (!NjordMenuGUI.removePenalty) return true;
+                if (!ElysiumModMenuGUI.removePenalty) return true;
                 if (AmongUsClient.Instance == null || AmongUsClient.Instance.NetworkMode != NetworkModes.OnlineGame)
                     return true;
 
@@ -4053,7 +4397,7 @@ namespace NjordMenu
         {
             public static void Postfix(GameStartManager __instance)
             {
-                if (!NjordMenuGUI.alwaysShowLobbyTimer) return;
+                if (!ElysiumModMenuGUI.alwaysShowLobbyTimer) return;
 
                 if (__instance == null || GameData.Instance == null || AmongUsClient.Instance == null) return;
                 if (AmongUsClient.Instance.NetworkMode == NetworkModes.LocalGame || !AmongUsClient.Instance.AmHost) return;
@@ -5309,7 +5653,7 @@ namespace NjordMenu
 
         public static Sprite LoadEmbeddedSprite(string fileName, float pixelsPerUnit = 1f)
         {
-            string path = $"NjordMenu.{fileName}";
+            string path = $"ElysiumModMenu.{fileName}";
 
             try
             {
@@ -5321,7 +5665,7 @@ namespace NjordMenu
 
                 if (stream == null)
                 {
-                    System.Console.WriteLine($"[NJORD] Стрим равен null! Убедись, что {fileName} установлен как Embedded Resource.");
+                    System.Console.WriteLine($"[ELYSIUM] Стрим равен null! Убедись, что {fileName} установлен как Embedded Resource.");
                     return null;
                 }
 
@@ -5339,7 +5683,7 @@ namespace NjordMenu
             }
             catch (System.Exception ex)
             {
-                System.Console.WriteLine($"[NJORD] Ошибка загрузки спрайта {fileName}: " + ex.Message);
+                System.Console.WriteLine($"[ELYSIUM] Ошибка загрузки спрайта {fileName}: " + ex.Message);
                 return null;
             }
         }
@@ -5349,14 +5693,14 @@ namespace NjordMenu
             UnlockCosmetics();
             LoadConfig();
             LoadBanList();
-           
+
 
             try
             {
-                int starts = UnityEngine.PlayerPrefs.GetInt("Njord_GameStarts", 0);
+                int starts = UnityEngine.PlayerPrefs.GetInt("Elysium_GameStarts", 0);
                 starts++;
 
-                string chatLogPath = System.IO.Path.Combine(Plugin.NjordFolder, "ChatLog.txt");
+                string chatLogPath = System.IO.Path.Combine(Plugin.ElysiumFolder, "ChatLog.txt");
 
                 if (starts >= 3)
                 {
@@ -5367,7 +5711,7 @@ namespace NjordMenu
                     starts = 0;
                 }
 
-                UnityEngine.PlayerPrefs.SetInt("Njord_GameStarts", starts);
+                UnityEngine.PlayerPrefs.SetInt("Elysium_GameStarts", starts);
                 UnityEngine.PlayerPrefs.Save();
             }
             catch { }
@@ -5379,7 +5723,7 @@ namespace NjordMenu
             KeyCode toggleKey = keyBinds.ContainsKey("Toggle Menu") ? keyBinds["Toggle Menu"] : KeyCode.Insert;
             if (Input.GetKeyDown(toggleKey) || Input.GetKeyDown(KeyCode.RightShift)) showMenu = !showMenu;
 
-            bool isTypingOrBinding = isEditingName || isEditingLevel || isEditingFriendCode || isEditingBan ||
+            bool isTypingOrBinding = isEditingName || isEditingLevel || isEditingFriendCode || isEditingLocalFriendCode || isEditingBan || customChatInputFocused ||
                                      isWaitingForBind || isWaitBindMassMorph || isWaitBindSpawnLobby ||
                                      isWaitBindDespawnLobby || isWaitBindCloseMeeting || isWaitBindInstaStart ||
                                      isWaitBindEndCrew || isWaitBindEndImp || isWaitBindEndImpDC || isWaitBindEndHnsDC;
@@ -5416,8 +5760,8 @@ namespace NjordMenu
                 if (bindEndHnsDC != KeyCode.None && Input.GetKeyDown(bindEndHnsDC)) SmartEndGame("HnsImpDisconnect");
             }
 
-            NjordAutoHostService.Tick();
-            NjordAutoLobbyReturn.UpdateLogic();
+            ElysiumAutoHostService.Tick();
+            ElysiumAutoLobbyReturn.UpdateLogic();
             if (votekickEveryone)
             {
                 TickVotekickEveryoneRun();
@@ -5428,16 +5772,44 @@ namespace NjordMenu
                 if (rgbMenuHue > 1f) rgbMenuHue -= 1f;
                 UpdateAccentColor(Color.HSVToRGB(rgbMenuHue, 1f, 1f));
             }
-if (PlayerControl.LocalPlayer != null)
+            if (PlayerControl.LocalPlayer != null)
             {
                 TryHostOnlyKillAuraTick();
                 TryAutoBanBrokenFriendCodeTick();
 
+                if (enableLocalNameSpoof && !isEditingName)
+                {
+                    localNameRefreshTimer += Time.deltaTime;
+                    if (localNameRefreshTimer >= 0.5f)
+                    {
+                        localNameRefreshTimer = 0f;
+                        ApplyLocalNameSelf(customNameInput, false);
+                    }
+                }
+                else
+                {
+                    localNameRefreshTimer = 0f;
+                }
+
+                if (enableLocalFriendCodeSpoof && !isEditingLocalFriendCode)
+                {
+                    localFriendCodeRefreshTimer += Time.deltaTime;
+                    if (localFriendCodeRefreshTimer >= 0.5f)
+                    {
+                        localFriendCodeRefreshTimer = 0f;
+                        ApplyLocalFriendCodeSelf(localFriendCodeInput, false);
+                    }
+                }
+                else
+                {
+                    localFriendCodeRefreshTimer = 0f;
+                }
+
                 if (Input.GetKeyDown(KeyCode.F9))
                 {
                     autoFollowCursor = !autoFollowCursor;
-                    ShowNotification(autoFollowCursor ? 
-                        "<color=#00FF00>[MAGNET]</color> Magnet Cursor: ON" : 
+                    ShowNotification(autoFollowCursor ?
+                        "<color=#00FF00>[MAGNET]</color> Magnet Cursor: ON" :
                         "<color=#FF0000>[MAGNET]</color> Magnet Cursor: OFF");
                 }
 
@@ -5783,7 +6155,7 @@ if (PlayerControl.LocalPlayer != null)
         {
             Event e = Event.current;
 
-            bool isTyping = isEditingName || isEditingLevel || isEditingFriendCode || isEditingBan;
+            bool isTyping = isEditingName || isEditingLevel || isEditingFriendCode || isEditingLocalFriendCode || isEditingBan;
             bool isBinding = isWaitingForBind || isWaitBindMassMorph || isWaitBindSpawnLobby || isWaitBindDespawnLobby ||
                   isWaitBindCloseMeeting || isWaitBindInstaStart || isWaitBindEndCrew || isWaitBindEndImp ||
                   isWaitBindEndImpDC || isWaitBindEndHnsDC || isWaitBindMagnetCursor;
@@ -5792,7 +6164,7 @@ if (PlayerControl.LocalPlayer != null)
             {
                 if (e.keyCode == KeyCode.Escape)
                 {
-                    isEditingName = isEditingLevel = isEditingFriendCode = isEditingBan = false;
+                    isEditingName = isEditingLevel = isEditingFriendCode = isEditingLocalFriendCode = isEditingBan = false;
                     ResetAllBindWaits();
                     e.Use();
                 }
@@ -5815,12 +6187,18 @@ if (PlayerControl.LocalPlayer != null)
                 }
                 else if (isTyping)
                 {
-                    if (e.keyCode == KeyCode.Backspace)
+                    if (isEditingBan && HandleClipboardShortcut(e, ref banInput)) { }
+                    else if (isEditingName && HandleClipboardShortcut(e, ref customNameInput)) { }
+                    else if (isEditingLevel && HandleClipboardShortcut(e, ref spoofLevelString)) { }
+                    else if (isEditingFriendCode && HandleClipboardShortcut(e, ref spoofFriendCodeInput)) { }
+                    else if (isEditingLocalFriendCode && HandleClipboardShortcut(e, ref localFriendCodeInput)) { }
+                    else if (e.keyCode == KeyCode.Backspace)
                     {
                         if (isEditingBan && banInput.Length > 0) { banInput = banInput.Substring(0, banInput.Length - 1); }
                         if (isEditingName && customNameInput.Length > 0) { customNameInput = customNameInput.Substring(0, customNameInput.Length - 1); }
                         if (isEditingLevel && spoofLevelString.Length > 0) { spoofLevelString = spoofLevelString.Substring(0, spoofLevelString.Length - 1); }
                         if (isEditingFriendCode && spoofFriendCodeInput.Length > 0) { spoofFriendCodeInput = spoofFriendCodeInput.Substring(0, spoofFriendCodeInput.Length - 1); }
+                        if (isEditingLocalFriendCode && localFriendCodeInput.Length > 0) { localFriendCodeInput = localFriendCodeInput.Substring(0, localFriendCodeInput.Length - 1); }
                         e.Use();
                     }
                     else if (e.character != 0 && e.character != '\n' && e.character != '\r')
@@ -5829,6 +6207,7 @@ if (PlayerControl.LocalPlayer != null)
                         if (isEditingName) { customNameInput += e.character; }
                         if (isEditingLevel) { spoofLevelString += e.character; }
                         if (isEditingFriendCode) { spoofFriendCodeInput += e.character; }
+                        if (isEditingLocalFriendCode) { localFriendCodeInput += e.character; }
                         e.Use();
                     }
                 }
@@ -5856,7 +6235,7 @@ if (PlayerControl.LocalPlayer != null)
 
                 if (showMenu)
                 {
-                    windowRect = GUI.Window(0, windowRect, (Action<int>)DrawNjordMenu, "", windowStyle);
+                    windowRect = GUI.Window(0, windowRect, (Action<int>)DrawElysiumModMenu, "", windowStyle);
                 }
 
                 for (int i = screenNotifications.Count - 1; i >= 0; i--)
@@ -5865,7 +6244,7 @@ if (PlayerControl.LocalPlayer != null)
                     if (screenNotifications[i].HasExpired) screenNotifications.RemoveAt(i);
                 }
             }
-        
+
             try
             {
                 if (AmongUsClient.Instance != null && (AmongUsClient.Instance.GameState == InnerNetClient.GameStates.Joined || AmongUsClient.Instance.GameState == InnerNetClient.GameStates.Started))
@@ -5912,7 +6291,7 @@ if (PlayerControl.LocalPlayer != null)
                                         catch { }
 
                                         string platform = GetPlatform(AmongUsClient.Instance.GetClientFromCharacter(pc));
-                                        string fc = string.IsNullOrEmpty(pc.Data.FriendCode) ? "Hidden" : pc.Data.FriendCode;
+                                        string fc = GetDisplayedFriendCode(pc.Data);
 
                                         ShowNotification($"<color=#00FF00>[+]</color> {pc.Data.PlayerName} joined\n<color=#aaaaaa>Lvl: {level} | {platform} | FC: {fc}</color>");
                                     }
@@ -5945,7 +6324,7 @@ if (PlayerControl.LocalPlayer != null)
                 int startIdx = Mathf.Max(0, screenNotifications.Count - maxNotifs);
                 for (int i = startIdx; i < screenNotifications.Count; i++)
                 {
-                    NjordNotification notif = screenNotifications[i];
+                    ElysiumNotification notif = screenNotifications[i];
                     int reverseIndex = screenNotifications.Count - 1 - i;
 
                     float slideOffset = 0f;
@@ -6197,7 +6576,7 @@ if (PlayerControl.LocalPlayer != null)
             }
         }
 
-        private void DrawNjordMenu(int windowID)
+        private void DrawElysiumModMenu(int windowID)
         {
             if (Event.current.type == EventType.Repaint && tabTransitionProgress < 1f)
             {
@@ -6214,7 +6593,7 @@ if (PlayerControl.LocalPlayer != null)
             }
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label(ApplyMenuShimmer("NjordMenu Meowchelo & Carrot"), titleStyle);
+            GUILayout.Label(ApplyMenuShimmer("ElysiumModMenu Meowchelo & Carrot"), titleStyle);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("-", new GUIStyle(btnStyle) { fixedWidth = 20, fixedHeight = 18, margin = CreateRectOffset(0, 8, 6, 0) })) showMenu = false;
             GUILayout.EndHorizontal();
@@ -6277,7 +6656,7 @@ if (PlayerControl.LocalPlayer != null)
         {
             public static bool Prefix(PlayerPhysics __instance)
             {
-                if (NjordMenuGUI.moonWalk && __instance.AmOwner)
+                if (ElysiumModMenuGUI.moonWalk && __instance.AmOwner)
                 {
                     __instance.ResetAnimState();
                     return false;
@@ -6285,7 +6664,7 @@ if (PlayerControl.LocalPlayer != null)
                 return true;
             }
         }
-      
+
         [HarmonyPatch(typeof(FreeChatInputField), nameof(FreeChatInputField.UpdateCharCount))]
         public static class FreeChatInputField_UpdateCharCount_Patch
         {
@@ -6483,6 +6862,56 @@ if (PlayerControl.LocalPlayer != null)
                 default: return $"Unknown ({platformId})";
             }
         }
+
+        private static string CompactEspValue(string value, int maxLength = 24)
+        {
+            value = Regex.Replace(value ?? string.Empty, "<.*?>", string.Empty)
+                .Replace('\r', ' ')
+                .Replace('\n', ' ')
+                .Trim();
+
+            if (string.IsNullOrEmpty(value)) return "Hidden";
+            if (value.Length > maxLength) value = value.Substring(0, maxLength - 3) + "...";
+            return value;
+        }
+
+        public static string BuildESPInfoLine(NetworkedPlayerInfo info)
+        {
+            if (info == null) return string.Empty;
+
+            int level = 0;
+            string platform = "Unknown";
+            bool isHost = false;
+
+            try { level = (int)info.PlayerLevel + 1; } catch { }
+
+            try
+            {
+                var client = AmongUsClient.Instance.GetClientFromPlayerInfo(info);
+                if (client != null)
+                {
+                    platform = GetPlatform(client);
+                    isHost = AmongUsClient.Instance.GetHost() == client;
+                }
+            }
+            catch { }
+
+            if (enablePlatformSpoof &&
+                PlayerControl.LocalPlayer != null &&
+                info.PlayerId == PlayerControl.LocalPlayer.PlayerId)
+            {
+                platform = $"{platform} spf";
+            }
+
+            string fc = CompactEspValue(GetDisplayedFriendCode(info));
+            List<string> parts = new List<string>();
+            if (isHost) parts.Add("Host");
+            parts.Add($"Lv:{level}");
+            parts.Add(platform);
+            parts.Add(fc);
+            return string.Join(" - ", parts);
+        }
+
         public static Color GetRoleColor(int roleId, Color fallbackColor)
         {
             switch (roleId)
@@ -6662,17 +7091,8 @@ if (PlayerControl.LocalPlayer != null)
             }
             if (showPlayerInfo)
             {
-                int level = 0; string platform = "Unknown"; string hostStr = "";
-                try { level = (int)info.PlayerLevel + 1; } catch { }
-                try
-                {
-                    var client = AmongUsClient.Instance.GetClientFromPlayerInfo(info);
-                    if (client != null) { platform = GetPlatform(client); if (AmongUsClient.Instance.GetHost() == client) hostStr = "Host - "; }
-                }
-                catch { }
-
                 string accentHex = ColorUtility.ToHtmlStringRGB(GetThemeAccentColor(currentAccentColor));
-                newName = $"<size=80%><color=#{accentHex}>{hostStr}Lv:{level} - {platform}</color></size>\n{newName}";
+                newName = $"<size=80%><color=#{accentHex}>{BuildESPInfoLine(info)}</color></size>\n{newName}";
             }
             if (seeKillCooldown && info.Role != null && info.PlayerId != PlayerControl.LocalPlayer?.PlayerId)
             {
@@ -6757,10 +7177,10 @@ if (PlayerControl.LocalPlayer != null)
 
 
         [HarmonyPatch(typeof(VersionShower), nameof(VersionShower.Start))]
-    public static class VersionShower_Start_Patch
-    {
-        public static void Postfix(VersionShower __instance) { if (__instance != null && __instance.text != null) __instance.text.text = NjordMenuGUI.ApplyMenuShimmer("NjordMenu Meowchelo & Carrot"); }
-    }
+        public static class VersionShower_Start_Patch
+        {
+            public static void Postfix(VersionShower __instance) { if (__instance != null && __instance.text != null) __instance.text.text = ElysiumModMenuGUI.ApplyMenuShimmer("ElysiumModMenu Meowchelo & Carrot"); }
+        }
 
         [HarmonyPatch(typeof(PingTracker), nameof(PingTracker.Update))]
         public static class PingTracker_Watermark_Patch
@@ -6779,9 +7199,9 @@ if (PlayerControl.LocalPlayer != null)
 
                     string finalString = $"<color=#FFFFFF>PING:</color> <color={pingColor}>{_smoothPing} ms</color> • <color=#FFFFFF>FPS:</color> <color=#FFFFFF>{num}</color>";
 
-                    if (NjordMenuGUI.showWatermark)
+                    if (ElysiumModMenuGUI.showWatermark)
                     {
-                        string shimmerTitle = NjordMenuGUI.ApplyMenuShimmer("NjordMenu v1.2.7");
+                        string shimmerTitle = ElysiumModMenuGUI.ApplyMenuShimmer("ElysiumModMenu v1.3.0");
                         finalString = $"{shimmerTitle} • " + finalString;
                     }
 
@@ -6791,7 +7211,7 @@ if (PlayerControl.LocalPlayer != null)
                         if (host != null && host.Character != null)
                         {
                             string hostName = host.Character.Data.PlayerName ?? "Unknown";
-                            string shimmerHostName = NjordMenuGUI.ApplyMenuShimmer(hostName);
+                            string shimmerHostName = ElysiumModMenuGUI.ApplyMenuShimmer(hostName);
                             finalString += $" • <color=#FFFFFF>Host:</color> {shimmerHostName}";
                             if (AmongUsClient.Instance.AmHost) finalString += " <color=#00FF00>(You)</color>";
                         }
@@ -6807,55 +7227,115 @@ if (PlayerControl.LocalPlayer != null)
         }
 
         [HarmonyPatch(typeof(GameStartManager), nameof(GameStartManager.Update))]
-    public static class GameStartManager_Update_Patch
-    {
-        public static void Postfix(GameStartManager __instance)
+        public static class GameStartManager_Update_Patch
         {
-            if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || PlayerControl.LocalPlayer == null) return;
-            if (NjordMenuGUI.fakeStartCounterTroll)
+            public static void Postfix(GameStartManager __instance)
             {
-                try { sbyte[] arr = { -123, -111, -100, -69, -67, -52, -42, 0, 42, 52, 67, 69, 100, 111, 123 }; sbyte b = arr[UnityEngine.Random.Range(0, arr.Length)]; PlayerControl.LocalPlayer.RpcSetStartCounter(b); __instance.SetStartCounter(b); } catch { }
-            }
-            else if (NjordMenuGUI.fakeStartCounterCustom && int.TryParse(NjordMenuGUI.fakeStartInput, out int custom))
-            {
-                try { PlayerControl.LocalPlayer.RpcSetStartCounter(custom); __instance.SetStartCounter((sbyte)Mathf.Clamp(custom, -128, 127)); } catch { }
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(GameManager), nameof(GameManager.RpcEndGame))]
-    public static class InfiniteGamePatch { public static bool Prefix() { try { if (NjordMenuGUI.neverEndGame && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost) return false; } catch { } return true; } }
-
-    [HarmonyPatch(typeof(IntroCutscene), "CoBegin")]
-    public static class IntroCutscene_CoBegin_Patch
-    {
-        public static void Prefix()
-        {
-            if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
-            if (NjordMenuGUI.enablePreGameRoleForce)
-            {
-                foreach (var kvp in NjordMenuGUI.forcedPreGameRoles)
-                { var target = GameData.Instance.GetPlayerById(kvp.Key)?.Object; if (target != null && target.Data.RoleType != kvp.Value) target.RpcSetRole(kvp.Value); }
-                foreach (byte impId in NjordMenuGUI.forcedImpostors)
-                { var target = GameData.Instance.GetPlayerById(impId)?.Object; if (target != null && target.Data.Role != null && !target.Data.Role.IsImpostor) target.RpcSetRole(RoleTypes.Impostor); }
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || PlayerControl.LocalPlayer == null) return;
+                if (ElysiumModMenuGUI.fakeStartCounterTroll)
+                {
+                    try { sbyte[] arr = { -123, -111, -100, -69, -67, -52, -42, 0, 42, 52, 67, 69, 100, 111, 123 }; sbyte b = arr[UnityEngine.Random.Range(0, arr.Length)]; PlayerControl.LocalPlayer.RpcSetStartCounter(b); __instance.SetStartCounter(b); } catch { }
+                }
+                else if (ElysiumModMenuGUI.fakeStartCounterCustom && int.TryParse(ElysiumModMenuGUI.fakeStartInput, out int custom))
+                {
+                    try { PlayerControl.LocalPlayer.RpcSetStartCounter(custom); __instance.SetStartCounter((sbyte)Mathf.Clamp(custom, -128, 127)); } catch { }
+                }
             }
         }
-    }
 
-    [HarmonyPatch(typeof(LogicRoleSelectionNormal), "AssignRolesForTeam")]
-    public static class RoleSelectionNormal_Patch
-    {
-        public static bool Prefix(Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo> players, IGameOptions opts, RoleTeamTypes team, ref int teamMax)
+        [HarmonyPatch(typeof(GameManager), nameof(GameManager.RpcEndGame))]
+        public static class InfiniteGamePatch { public static bool Prefix() { try { if (ElysiumModMenuGUI.neverEndGame && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost) return false; } catch { } return true; } }
+
+        [HarmonyPatch(typeof(IntroCutscene), "CoBegin")]
+        public static class IntroCutscene_CoBegin_Patch
         {
-            if (!NjordMenuGUI.enablePreGameRoleForce || !AmongUsClient.Instance.AmHost) return true;
-            try
+            public static void Prefix()
             {
-                if ((int)team == 1)
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                if (ElysiumModMenuGUI.enablePreGameRoleForce)
+                {
+                    foreach (var kvp in ElysiumModMenuGUI.forcedPreGameRoles)
+                    { var target = GameData.Instance.GetPlayerById(kvp.Key)?.Object; if (target != null && target.Data.RoleType != kvp.Value) target.RpcSetRole(kvp.Value); }
+                    foreach (byte impId in ElysiumModMenuGUI.forcedImpostors)
+                    { var target = GameData.Instance.GetPlayerById(impId)?.Object; if (target != null && target.Data.Role != null && !target.Data.Role.IsImpostor) target.RpcSetRole(RoleTypes.Impostor); }
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(LogicRoleSelectionNormal), "AssignRolesForTeam")]
+        public static class RoleSelectionNormal_Patch
+        {
+            public static bool Prefix(Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo> players, IGameOptions opts, RoleTeamTypes team, ref int teamMax)
+            {
+                if (!ElysiumModMenuGUI.enablePreGameRoleForce || !AmongUsClient.Instance.AmHost) return true;
+                try
+                {
+                    if ((int)team == 1)
+                    {
+                        int numImps = opts.GetInt((Int32OptionNames)1);
+                        var impRoleTypes = new HashSet<int> { 1, 5, 9, 18 };
+                        List<byte> allForced = new List<byte>(ElysiumModMenuGUI.forcedImpostors);
+                        foreach (var kvp in ElysiumModMenuGUI.forcedPreGameRoles) if (impRoleTypes.Contains((int)kvp.Value) && !allForced.Contains(kvp.Key)) allForced.Add(kvp.Key);
+                        if (allForced.Count > 0) numImps = allForced.Count;
+                        else { if (numImps >= players.Count) numImps = players.Count - 1; if (numImps < 1) numImps = 1; }
+                        int assigned = 0;
+                        foreach (byte impId in allForced)
+                        {
+                            if (players.Count == 0 || assigned >= numImps) break;
+                            var targetInfo = players.ToArray().FirstOrDefault(p => p.PlayerId == impId);
+                            if (targetInfo != null && targetInfo.Object != null)
+                            {
+                                RoleTypes role = ElysiumModMenuGUI.forcedPreGameRoles.ContainsKey(impId) ? ElysiumModMenuGUI.forcedPreGameRoles[impId] : RoleTypes.Impostor;
+                                targetInfo.Object.RpcSetRole(role, false);
+                                players.Remove(targetInfo);
+                                assigned++;
+                            }
+                        }
+                        while (assigned < numImps && players.Count > 0)
+                        {
+                            int idx = UnityEngine.Random.Range(0, players.Count);
+                            players[idx].Object.RpcSetRole(RoleTypes.Impostor, false);
+                            players.RemoveAt(idx);
+                            assigned++;
+                        }
+                        return false;
+                    }
+                    else if ((int)team == 0)
+                    {
+                        var crewRoleTypes = new HashSet<int> { 0, 2, 3, 4, 8, 10, 12 };
+                        for (int i = players.Count - 1; i >= 0; i--)
+                        {
+                            var p = players[i];
+                            if (p != null && p.Object != null)
+                            {
+                                RoleTypes role = RoleTypes.Crewmate;
+                                if (ElysiumModMenuGUI.forcedPreGameRoles.ContainsKey(p.PlayerId) && crewRoleTypes.Contains((int)ElysiumModMenuGUI.forcedPreGameRoles[p.PlayerId]))
+                                    role = ElysiumModMenuGUI.forcedPreGameRoles[p.PlayerId];
+                                p.Object.RpcSetRole(role, false);
+                                players.RemoveAt(i);
+                            }
+                        }
+                        return false;
+                    }
+                    return true;
+                }
+                catch { return true; }
+            }
+        }
+
+        [HarmonyPatch(typeof(LogicRoleSelectionHnS), "AssignRolesForTeam")]
+        public static class RoleSelectionHnS_Patch
+        {
+            public static bool Prefix(Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo> players, IGameOptions opts, RoleTeamTypes team, ref int teamMax)
+            {
+                if (!ElysiumModMenuGUI.enablePreGameRoleForce || !AmongUsClient.Instance.AmHost) return true;
+                if ((int)team != 1) return true;
+                try
                 {
                     int numImps = opts.GetInt((Int32OptionNames)1);
                     var impRoleTypes = new HashSet<int> { 1, 5, 9, 18 };
-                    List<byte> allForced = new List<byte>(NjordMenuGUI.forcedImpostors);
-                    foreach (var kvp in NjordMenuGUI.forcedPreGameRoles) if (impRoleTypes.Contains((int)kvp.Value) && !allForced.Contains(kvp.Key)) allForced.Add(kvp.Key);
+                    List<byte> allForced = new List<byte>(ElysiumModMenuGUI.forcedImpostors);
+                    foreach (var kvp in ElysiumModMenuGUI.forcedPreGameRoles) if (impRoleTypes.Contains((int)kvp.Value) && !allForced.Contains(kvp.Key)) allForced.Add(kvp.Key);
                     if (allForced.Count > 0) numImps = allForced.Count;
                     else { if (numImps >= players.Count) numImps = players.Count - 1; if (numImps < 1) numImps = 1; }
                     int assigned = 0;
@@ -6863,224 +7343,155 @@ if (PlayerControl.LocalPlayer != null)
                     {
                         if (players.Count == 0 || assigned >= numImps) break;
                         var targetInfo = players.ToArray().FirstOrDefault(p => p.PlayerId == impId);
-                        if (targetInfo != null && targetInfo.Object != null)
-                        {
-                            RoleTypes role = NjordMenuGUI.forcedPreGameRoles.ContainsKey(impId) ? NjordMenuGUI.forcedPreGameRoles[impId] : RoleTypes.Impostor;
-                            targetInfo.Object.RpcSetRole(role, false);
-                            players.Remove(targetInfo);
-                            assigned++;
-                        }
+                        if (targetInfo != null) { targetInfo.Object.RpcSetRole((RoleTypes)1, false); players.Remove(targetInfo); assigned++; }
                     }
                     while (assigned < numImps && players.Count > 0)
                     {
                         int idx = UnityEngine.Random.Range(0, players.Count);
-                        players[idx].Object.RpcSetRole(RoleTypes.Impostor, false);
+                        players[idx].Object.RpcSetRole((RoleTypes)1, false);
                         players.RemoveAt(idx);
                         assigned++;
                     }
                     return false;
                 }
-                else if ((int)team == 0)
-                {
-                    var crewRoleTypes = new HashSet<int> { 0, 2, 3, 4, 8, 10, 12 };
-                    for (int i = players.Count - 1; i >= 0; i--)
-                    {
-                        var p = players[i];
-                        if (p != null && p.Object != null)
-                        {
-                            RoleTypes role = RoleTypes.Crewmate;
-                            if (NjordMenuGUI.forcedPreGameRoles.ContainsKey(p.PlayerId) && crewRoleTypes.Contains((int)NjordMenuGUI.forcedPreGameRoles[p.PlayerId]))
-                                role = NjordMenuGUI.forcedPreGameRoles[p.PlayerId];
-                            p.Object.RpcSetRole(role, false);
-                            players.RemoveAt(i);
-                        }
-                    }
-                    return false;
-                }
-                return true;
+                catch { return true; }
             }
-            catch { return true; }
         }
-    }
 
-    [HarmonyPatch(typeof(LogicRoleSelectionHnS), "AssignRolesForTeam")]
-    public static class RoleSelectionHnS_Patch
-    {
-        public static bool Prefix(Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo> players, IGameOptions opts, RoleTeamTypes team, ref int teamMax)
+        [HarmonyPatch(typeof(RoleManager), nameof(RoleManager.SelectRoles))]
+        public static class RoleManager_SelectRoles_Patch
         {
-            if (!NjordMenuGUI.enablePreGameRoleForce || !AmongUsClient.Instance.AmHost) return true;
-            if ((int)team != 1) return true;
-            try
+            public static bool Prefix(RoleManager __instance)
             {
-                int numImps = opts.GetInt((Int32OptionNames)1);
-                var impRoleTypes = new HashSet<int> { 1, 5, 9, 18 };
-                List<byte> allForced = new List<byte>(NjordMenuGUI.forcedImpostors);
-                foreach (var kvp in NjordMenuGUI.forcedPreGameRoles) if (impRoleTypes.Contains((int)kvp.Value) && !allForced.Contains(kvp.Key)) allForced.Add(kvp.Key);
-                if (allForced.Count > 0) numImps = allForced.Count;
-                else { if (numImps >= players.Count) numImps = players.Count - 1; if (numImps < 1) numImps = 1; }
-                int assigned = 0;
-                foreach (byte impId in allForced)
-                {
-                    if (players.Count == 0 || assigned >= numImps) break;
-                    var targetInfo = players.ToArray().FirstOrDefault(p => p.PlayerId == impId);
-                    if (targetInfo != null) { targetInfo.Object.RpcSetRole((RoleTypes)1, false); players.Remove(targetInfo); assigned++; }
-                }
-                while (assigned < numImps && players.Count > 0)
-                {
-                    int idx = UnityEngine.Random.Range(0, players.Count);
-                    players[idx].Object.RpcSetRole((RoleTypes)1, false);
-                    players.RemoveAt(idx);
-                    assigned++;
-                }
-                return false;
-            }
-            catch { return true; }
-        }
-    }
-
-    [HarmonyPatch(typeof(RoleManager), nameof(RoleManager.SelectRoles))]
-    public static class RoleManager_SelectRoles_Patch
-    {
-        public static bool Prefix(RoleManager __instance)
-        {
-            if (!NjordMenuGUI.enablePreGameRoleForce || !AmongUsClient.Instance.AmHost) return true;
-            try
-            {
-                var allPlayers = PlayerControl.AllPlayerControls.ToArray().Where(p => p != null && p.Data != null && !p.Data.Disconnected && !p.Data.IsDead).ToList();
-                int numImps = 1;
-                try { numImps = GameOptionsManager.Instance.CurrentGameOptions.GetInt((Int32OptionNames)1); } catch { }
-                var impRoleTypes = new HashSet<int> { 1, 5, 9, 18 };
-                List<PlayerControl> impostors = new List<PlayerControl>();
-                foreach (var p in allPlayers)
-                    if (NjordMenuGUI.forcedImpostors.Contains(p.PlayerId) || (NjordMenuGUI.forcedPreGameRoles.ContainsKey(p.PlayerId) && impRoleTypes.Contains((int)NjordMenuGUI.forcedPreGameRoles[p.PlayerId])))
-                        impostors.Add(p);
-                if (impostors.Count > 0) numImps = impostors.Count;
-                else { if (numImps >= allPlayers.Count) numImps = allPlayers.Count - 1; if (numImps < 1) numImps = 1; }
-                System.Random rand = new System.Random();
-                while (impostors.Count < numImps && allPlayers.Count > impostors.Count)
-                {
-                    var available = allPlayers.Where(p => !impostors.Contains(p)).ToList();
-                    impostors.Add(available[rand.Next(available.Count)]);
-                }
-                List<PlayerControl> crewmates = allPlayers.Where(p => !impostors.Contains(p)).ToList();
-                var impData = new Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo>();
-                foreach (var i in impostors) impData.Add(i.Data);
-                var crewData = new Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo>();
-                foreach (var c in crewmates) crewData.Add(c.Data);
-                IGameOptions opts = GameOptionsManager.Instance.CurrentGameOptions;
-                GameManager.Instance.LogicRoleSelection.AssignRolesForTeam(impData, opts, (RoleTeamTypes)1, int.MaxValue, new Il2CppSystem.Nullable<RoleTypes>());
-                GameManager.Instance.LogicRoleSelection.AssignRolesForTeam(crewData, opts, (RoleTeamTypes)0, int.MaxValue, new Il2CppSystem.Nullable<RoleTypes>((RoleTypes)0));
-                foreach (var kvp in NjordMenuGUI.forcedPreGameRoles)
-                {
-                    if (kvp.Value != RoleTypes.Crewmate && kvp.Value != RoleTypes.Impostor)
-                    {
-                        var pc = allPlayers.FirstOrDefault(p => p.PlayerId == kvp.Key);
-                        if (pc != null) RoleManager.Instance.SetRole(pc, kvp.Value);
-                    }
-                }
-                foreach (var pc in allPlayers) if (pc.Data.Role != null) pc.Data.Role.Initialize(pc);
-                return false;
-            }
-            catch { return true; }
-        }
-    }
-
-    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.TurnOnProtection))]
-    public static class PlayerControl_TurnOnProtection_Patch
-    {
-        public static void Prefix(ref bool visible)
-        {
-            if (NjordMenuGUI.seeGhosts || NjordMenuGUI.seeProtections) visible = true;
-        }
-    }
-
-    [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.LateUpdate))]
-    public static class PlayerVisuals_LateUpdate_Patch
-    {
-        public static void Postfix(PlayerPhysics __instance)
-        {
-            if (__instance == null || __instance.myPlayer == null || __instance.myPlayer.Data == null) return;
-            try
-            {
-                if (NjordMenuGUI.seeGhosts && __instance.myPlayer.Data.IsDead && PlayerControl.LocalPlayer != null && !PlayerControl.LocalPlayer.Data.IsDead)
-                {
-                    __instance.myPlayer.Visible = true;
-                    var rend = __instance.myPlayer.GetComponent<SpriteRenderer>();
-                    if (rend != null) { Color c = rend.color; rend.color = new Color(c.r, c.g, c.b, 0.4f); }
-                }
-                var cosmetics = __instance.myPlayer.cosmetics;
-                var outfit = __instance.myPlayer.CurrentOutfit;
-                if (cosmetics != null && cosmetics.nameText != null && outfit != null)
-                {
-                    cosmetics.SetName(NjordMenuGUI.GetESPNameTag(__instance.myPlayer.Data, outfit.PlayerName));
-                    if (NjordMenuGUI.seeRoles && NjordMenuGUI.showPlayerInfo) cosmetics.nameText.transform.localPosition = new Vector3(0f, 0.186f, 0f);
-                    else if (NjordMenuGUI.seeRoles || NjordMenuGUI.showPlayerInfo) cosmetics.nameText.transform.localPosition = new Vector3(0f, 0.093f, 0f);
-                    else cosmetics.nameText.transform.localPosition = new Vector3(0f, 0f, 0f);
-                }
-            }
-            catch { }
-        }
-    }
-
-    [HarmonyPatch(typeof(MeetingHud), nameof(MeetingHud.Update))]
-    public static class ESP_MeetingHud
-    {
-        public static void Postfix(MeetingHud __instance)
-        {
-            try
-            {
-                if (__instance.playerStates == null) return;
-                foreach (var state in __instance.playerStates)
-                {
-                    if (state == null) continue;
-                    var data = GameData.Instance.GetPlayerById(state.TargetPlayerId);
-                    if (data != null && !data.Disconnected && data.DefaultOutfit != null && state.NameText != null)
-                    {
-                        string espName = NjordMenuGUI.GetESPNameTag(data, data.DefaultOutfit.PlayerName ?? "???");
-                        if (!NjordMenuGUI.seeRoles && NjordMenuGUI.revealMeetingRoles && data.Role != null)
-                        {
-                            string roleName = data.Role.Role.ToString();
-                            int roleId = (int)data.Role.Role;
-                            if (roleId == 8) roleName = "Noisemaker";
-                            else if (roleId == 9) roleName = "Phantom";
-                            else if (roleId == 10) roleName = "Tracker";
-                            else if (roleId == 12) roleName = "Detective";
-                            else if (roleId == 18) roleName = "Viper";
-                            else if (roleName == "GuardianAngel") roleName = "Guardian Angel";
-                            Color customColor = NjordMenuGUI.GetRoleColor(roleId, data.Role.TeamColor);
-                            string roleColor = ColorUtility.ToHtmlStringRGB(customColor);
-                            espName = $"<color=#{roleColor}>{roleName}</color>\n{espName}";
-                        }
-                        state.NameText.text = espName;
-                        bool showingExtra = NjordMenuGUI.seeRoles || NjordMenuGUI.revealMeetingRoles;
-                        if (showingExtra && NjordMenuGUI.showPlayerInfo) { state.NameText.transform.localPosition = new Vector3(0.33f, 0.08f, 0f); state.NameText.transform.localScale = new Vector3(0.75f, 0.75f, 0.75f); }
-                        else if (showingExtra || NjordMenuGUI.showPlayerInfo) { state.NameText.transform.localPosition = new Vector3(0.3384f, 0.1125f, -0.1f); state.NameText.transform.localScale = new Vector3(0.9f, 1f, 1f); }
-                        else { state.NameText.transform.localPosition = new Vector3(0.3384f, 0.0311f, -0.1f); state.NameText.transform.localScale = new Vector3(0.9f, 1f, 1f); }
-                    }
-                }
-            }
-            catch { }
-        }
-    }
-    [HarmonyPatch(typeof(ChatBubble), nameof(ChatBubble.SetName))]
-    public static class ChatBubble_SetName_Patch
-    {
-            public static void Postfix(ChatBubble __instance)
-            {
-                if (!NjordMenuGUI.showPlayerInfo || __instance.playerInfo == null) return;
+                if (!ElysiumModMenuGUI.enablePreGameRoleForce || !AmongUsClient.Instance.AmHost) return true;
                 try
                 {
-                    int level = 0; string platform = "Unknown"; string hostStr = "";
-                    try { level = (int)__instance.playerInfo.PlayerLevel + 1; } catch { }
-                    try
+                    var allPlayers = PlayerControl.AllPlayerControls.ToArray().Where(p => p != null && p.Data != null && !p.Data.Disconnected && !p.Data.IsDead).ToList();
+                    int numImps = 1;
+                    try { numImps = GameOptionsManager.Instance.CurrentGameOptions.GetInt((Int32OptionNames)1); } catch { }
+                    var impRoleTypes = new HashSet<int> { 1, 5, 9, 18 };
+                    List<PlayerControl> impostors = new List<PlayerControl>();
+                    foreach (var p in allPlayers)
+                        if (ElysiumModMenuGUI.forcedImpostors.Contains(p.PlayerId) || (ElysiumModMenuGUI.forcedPreGameRoles.ContainsKey(p.PlayerId) && impRoleTypes.Contains((int)ElysiumModMenuGUI.forcedPreGameRoles[p.PlayerId])))
+                            impostors.Add(p);
+                    if (impostors.Count > 0) numImps = impostors.Count;
+                    else { if (numImps >= allPlayers.Count) numImps = allPlayers.Count - 1; if (numImps < 1) numImps = 1; }
+                    System.Random rand = new System.Random();
+                    while (impostors.Count < numImps && allPlayers.Count > impostors.Count)
                     {
-                        var client = AmongUsClient.Instance.GetClientFromPlayerInfo(__instance.playerInfo);
-                        if (client != null) { platform = NjordMenuGUI.GetPlatform(client); if (AmongUsClient.Instance.GetHost() == client) hostStr = "Host - "; }
+                        var available = allPlayers.Where(p => !impostors.Contains(p)).ToList();
+                        impostors.Add(available[rand.Next(available.Count)]);
                     }
-                    catch { }
+                    List<PlayerControl> crewmates = allPlayers.Where(p => !impostors.Contains(p)).ToList();
+                    var impData = new Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo>();
+                    foreach (var i in impostors) impData.Add(i.Data);
+                    var crewData = new Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo>();
+                    foreach (var c in crewmates) crewData.Add(c.Data);
+                    IGameOptions opts = GameOptionsManager.Instance.CurrentGameOptions;
+                    GameManager.Instance.LogicRoleSelection.AssignRolesForTeam(impData, opts, (RoleTeamTypes)1, int.MaxValue, new Il2CppSystem.Nullable<RoleTypes>());
+                    GameManager.Instance.LogicRoleSelection.AssignRolesForTeam(crewData, opts, (RoleTeamTypes)0, int.MaxValue, new Il2CppSystem.Nullable<RoleTypes>((RoleTypes)0));
+                    foreach (var kvp in ElysiumModMenuGUI.forcedPreGameRoles)
+                    {
+                        if (kvp.Value != RoleTypes.Crewmate && kvp.Value != RoleTypes.Impostor)
+                        {
+                            var pc = allPlayers.FirstOrDefault(p => p.PlayerId == kvp.Key);
+                            if (pc != null) RoleManager.Instance.SetRole(pc, kvp.Value);
+                        }
+                    }
+                    foreach (var pc in allPlayers) if (pc.Data.Role != null) pc.Data.Role.Initialize(pc);
+                    return false;
+                }
+                catch { return true; }
+            }
+        }
 
-                    string accentHex = ColorUtility.ToHtmlStringRGB(NjordMenuGUI.currentAccentColor);
-                    string extra = $" <color=#{accentHex}><size=80%>{hostStr}Lv:{level} - {platform}</size></color>";
+        [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.TurnOnProtection))]
+        public static class PlayerControl_TurnOnProtection_Patch
+        {
+            public static void Prefix(ref bool visible)
+            {
+                if (ElysiumModMenuGUI.seeGhosts || ElysiumModMenuGUI.seeProtections) visible = true;
+            }
+        }
+
+        [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.LateUpdate))]
+        public static class PlayerVisuals_LateUpdate_Patch
+        {
+            public static void Postfix(PlayerPhysics __instance)
+            {
+                if (__instance == null || __instance.myPlayer == null || __instance.myPlayer.Data == null) return;
+                try
+                {
+                    if (ElysiumModMenuGUI.seeGhosts && __instance.myPlayer.Data.IsDead && PlayerControl.LocalPlayer != null && !PlayerControl.LocalPlayer.Data.IsDead)
+                    {
+                        __instance.myPlayer.Visible = true;
+                        var rend = __instance.myPlayer.GetComponent<SpriteRenderer>();
+                        if (rend != null) { Color c = rend.color; rend.color = new Color(c.r, c.g, c.b, 0.4f); }
+                    }
+                    var cosmetics = __instance.myPlayer.cosmetics;
+                    var outfit = __instance.myPlayer.CurrentOutfit;
+                    if (cosmetics != null && cosmetics.nameText != null && outfit != null)
+                    {
+                        cosmetics.SetName(ElysiumModMenuGUI.GetESPNameTag(__instance.myPlayer.Data, outfit.PlayerName));
+                        if (ElysiumModMenuGUI.seeRoles && ElysiumModMenuGUI.showPlayerInfo) cosmetics.nameText.transform.localPosition = new Vector3(0f, 0.186f, 0f);
+                        else if (ElysiumModMenuGUI.seeRoles || ElysiumModMenuGUI.showPlayerInfo) cosmetics.nameText.transform.localPosition = new Vector3(0f, 0.093f, 0f);
+                        else cosmetics.nameText.transform.localPosition = new Vector3(0f, 0f, 0f);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        [HarmonyPatch(typeof(MeetingHud), nameof(MeetingHud.Update))]
+        public static class ESP_MeetingHud
+        {
+            public static void Postfix(MeetingHud __instance)
+            {
+                try
+                {
+                    if (__instance.playerStates == null) return;
+                    foreach (var state in __instance.playerStates)
+                    {
+                        if (state == null) continue;
+                        var data = GameData.Instance.GetPlayerById(state.TargetPlayerId);
+                        if (data != null && !data.Disconnected && data.DefaultOutfit != null && state.NameText != null)
+                        {
+                            string espName = ElysiumModMenuGUI.GetESPNameTag(data, data.DefaultOutfit.PlayerName ?? "???");
+                            if (!ElysiumModMenuGUI.seeRoles && ElysiumModMenuGUI.revealMeetingRoles && data.Role != null)
+                            {
+                                string roleName = data.Role.Role.ToString();
+                                int roleId = (int)data.Role.Role;
+                                if (roleId == 8) roleName = "Noisemaker";
+                                else if (roleId == 9) roleName = "Phantom";
+                                else if (roleId == 10) roleName = "Tracker";
+                                else if (roleId == 12) roleName = "Detective";
+                                else if (roleId == 18) roleName = "Viper";
+                                else if (roleName == "GuardianAngel") roleName = "Guardian Angel";
+                                Color customColor = ElysiumModMenuGUI.GetRoleColor(roleId, data.Role.TeamColor);
+                                string roleColor = ColorUtility.ToHtmlStringRGB(customColor);
+                                espName = $"<color=#{roleColor}>{roleName}</color>\n{espName}";
+                            }
+                            state.NameText.text = espName;
+                            bool showingExtra = ElysiumModMenuGUI.seeRoles || ElysiumModMenuGUI.revealMeetingRoles;
+                            if (showingExtra && ElysiumModMenuGUI.showPlayerInfo) { state.NameText.transform.localPosition = new Vector3(0.33f, 0.08f, 0f); state.NameText.transform.localScale = new Vector3(0.75f, 0.75f, 0.75f); }
+                            else if (showingExtra || ElysiumModMenuGUI.showPlayerInfo) { state.NameText.transform.localPosition = new Vector3(0.3384f, 0.1125f, -0.1f); state.NameText.transform.localScale = new Vector3(0.9f, 1f, 1f); }
+                            else { state.NameText.transform.localPosition = new Vector3(0.3384f, 0.0311f, -0.1f); state.NameText.transform.localScale = new Vector3(0.9f, 1f, 1f); }
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+        [HarmonyPatch(typeof(ChatBubble), nameof(ChatBubble.SetName))]
+        public static class ChatBubble_SetName_Patch
+        {
+            public static void Postfix(ChatBubble __instance)
+            {
+                if (!ElysiumModMenuGUI.showPlayerInfo || __instance.playerInfo == null) return;
+                try
+                {
+                    string accentHex = ColorUtility.ToHtmlStringRGB(ElysiumModMenuGUI.currentAccentColor);
+                    string extra = $" <color=#{accentHex}><size=80%>{ElysiumModMenuGUI.BuildESPInfoLine(__instance.playerInfo)}</size></color>";
 
                     if (!__instance.NameText.text.Contains("Lv:")) __instance.NameText.text += extra;
                 }
@@ -7088,150 +7499,150 @@ if (PlayerControl.LocalPlayer != null)
             }
         }
 
-    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.RpcMurderPlayer))]
-    public static class KillCooldownTrackerPatch
-    {
-        public static void Prefix(PlayerControl __instance, PlayerControl target, bool didSucceed)
+        [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.RpcMurderPlayer))]
+        public static class KillCooldownTrackerPatch
         {
-            try
+            public static void Prefix(PlayerControl __instance, PlayerControl target, bool didSucceed)
             {
-                if (!didSucceed || __instance == null || __instance.Data == null) return;
-                NjordMenuGUI.lastKillTimestamps[__instance.PlayerId] = Time.time;
-            }
-            catch { }
-        }
-    }
-
-    [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
-    public static class FullBright_Patch
-    {
-        public static void Postfix(HudManager __instance)
-        {
-            try
-            {
-                if (__instance == null || __instance.ShadowQuad == null || __instance.ShadowQuad.gameObject == null) return;
-                __instance.ShadowQuad.gameObject.SetActive(!NjordMenuGUI.fullBright);
-            }
-            catch { }
-        }
-    }
-
-    [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
-    public static class HudManager_Update_Patch
-    {
-        public static void Postfix(HudManager __instance)
-        {
-            try
-            {
-                if (NjordMenuGUI.alwaysChat && __instance.Chat != null)
-                    __instance.Chat.gameObject.SetActive(true);
-            }
-            catch { }
-        }
-    }
-
-    [HarmonyPatch(typeof(PlatformSpecificData), nameof(PlatformSpecificData.Serialize))]
-    public static class PlatformSpooferPatch { public static void Prefix(PlatformSpecificData __instance) { try { if (NjordMenuGUI.enablePlatformSpoof && __instance != null) __instance.Platform = NjordMenuGUI.platformValues[NjordMenuGUI.currentPlatformIndex]; } catch { } } }
-
-    [HarmonyPatch(typeof(FullAccount), nameof(FullAccount.CanSetCustomName))]
-    public static class FullAccount_CanSetCustomName_Patch { public static void Prefix(ref bool canSetName) { try { if (NjordMenuGUI.unlockFeatures) canSetName = true; } catch { } } }
-
-    [HarmonyPatch(typeof(AccountManager), nameof(AccountManager.CanPlayOnline))]
-    public static class AccountManager_CanPlayOnline_Patch { public static void Postfix(ref bool __result) { try { if (NjordMenuGUI.unlockFeatures) __result = true; } catch { } } }
-
-    [HarmonyPatch(typeof(EngineerRole), "FixedUpdate")]
-    public static class EngineerCheatsPatch
-    {
-        public static void Postfix(EngineerRole __instance)
-        {
-            if (__instance.Player != PlayerControl.LocalPlayer) return;
-            if (NjordMenuGUI.endlessVentTime) __instance.inVentTimeRemaining = float.MaxValue;
-            if (NjordMenuGUI.noVentCooldown && __instance.cooldownSecondsRemaining > 0f)
-            {
-                __instance.cooldownSecondsRemaining = 0f;
-                var btn = DestroyableSingleton<HudManager>.Instance?.AbilityButton;
-                if (btn != null) { btn.ResetCoolDown(); btn.SetCooldownFill(0f); }
+                try
+                {
+                    if (!didSucceed || __instance == null || __instance.Data == null) return;
+                    ElysiumModMenuGUI.lastKillTimestamps[__instance.PlayerId] = Time.time;
+                }
+                catch { }
             }
         }
-    }
 
-    [HarmonyPatch(typeof(PlayerControl), "MurderPlayer")]
-    public static class KillCooldownTrackerPatch2
-    {
-        public static void Prefix(PlayerControl __instance, PlayerControl target)
+        [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
+        public static class FullBright_Patch
         {
-            try
+            public static void Postfix(HudManager __instance)
             {
-                if (__instance == null || __instance.Data == null) return;
-                NjordMenuGUI.lastKillTimestamps[__instance.PlayerId] = Time.time;
-
-                if (!NjordMenuGUI.spamReportBodies) return;
-                if (PlayerControl.LocalPlayer == null || PlayerControl.LocalPlayer.Data == null || PlayerControl.LocalPlayer.Data.IsDead) return;
-                if (target == null || target.Data == null || !target.Data.IsDead) return;
-
-                PlayerControl.LocalPlayer.CmdReportDeadBody(target.Data);
+                try
+                {
+                    if (__instance == null || __instance.ShadowQuad == null || __instance.ShadowQuad.gameObject == null) return;
+                    __instance.ShadowQuad.gameObject.SetActive(!ElysiumModMenuGUI.fullBright);
+                }
+                catch { }
             }
-            catch { }
         }
-    }
 
-    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetKillTimer))]
-    public static class KillAuraNoKillCooldownPatch
-    {
-        public static void Prefix(PlayerControl __instance, ref float time)
+        [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
+        public static class HudManager_Update_Patch
         {
-            try
+            public static void Postfix(HudManager __instance)
             {
-                if (!NjordMenuGUI.noKillCooldownHostOnly) return;
-                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
-                if (__instance != PlayerControl.LocalPlayer) return;
-                time = 0f;
+                try
+                {
+                    if (ElysiumModMenuGUI.alwaysChat && __instance.Chat != null)
+                        __instance.Chat.gameObject.SetActive(true);
+                }
+                catch { }
             }
-            catch { }
         }
-    }
 
-    [HarmonyPatch(typeof(ScientistRole), "Update")]
-    public static class ScientistCheatsPatch
-    {
-        public static void Postfix(ScientistRole __instance)
+        [HarmonyPatch(typeof(PlatformSpecificData), nameof(PlatformSpecificData.Serialize))]
+        public static class PlatformSpooferPatch { public static void Prefix(PlatformSpecificData __instance) { try { if (ElysiumModMenuGUI.enablePlatformSpoof && __instance != null) __instance.Platform = ElysiumModMenuGUI.platformValues[ElysiumModMenuGUI.currentPlatformIndex]; } catch { } } }
+
+        [HarmonyPatch(typeof(FullAccount), nameof(FullAccount.CanSetCustomName))]
+        public static class FullAccount_CanSetCustomName_Patch { public static void Prefix(ref bool canSetName) { try { if (ElysiumModMenuGUI.unlockFeatures) canSetName = true; } catch { } } }
+
+        [HarmonyPatch(typeof(AccountManager), nameof(AccountManager.CanPlayOnline))]
+        public static class AccountManager_CanPlayOnline_Patch { public static void Postfix(ref bool __result) { try { if (ElysiumModMenuGUI.unlockFeatures) __result = true; } catch { } } }
+
+        [HarmonyPatch(typeof(EngineerRole), "FixedUpdate")]
+        public static class EngineerCheatsPatch
         {
-            if (__instance.Player != PlayerControl.LocalPlayer) return;
-            if (NjordMenuGUI.noVitalsCooldown) __instance.currentCooldown = 0f;
-            if (NjordMenuGUI.endlessBattery) __instance.currentCharge = float.MaxValue;
-        }
-    }
-
-    [HarmonyPatch(typeof(ShapeshifterRole), "FixedUpdate")]
-    public static class ShapeshifterDurationPatch
-    {
-        public static void Postfix(ShapeshifterRole __instance) { if (__instance.Player == PlayerControl.LocalPlayer && NjordMenuGUI.endlessSsDuration) __instance.durationSecondsRemaining = float.MaxValue; }
-    }
-
-    [HarmonyPatch(typeof(ImpostorRole), "FindClosestTarget")]
-    public static class ImpostorRangePatch
-    {
-        public static bool Prefix(ImpostorRole __instance, ref PlayerControl __result)
-        {
-            if (!NjordMenuGUI.killReach) return true;
-            try
+            public static void Postfix(EngineerRole __instance)
             {
-                var target = PlayerControl.AllPlayerControls.ToArray()
-                    .Where(p => p != null && __instance.IsValidTarget(p.Data) && !p.Data.IsDead && !p.Data.Disconnected)
-                    .OrderBy(p => Vector2.Distance(p.transform.position, PlayerControl.LocalPlayer.transform.position))
-                    .FirstOrDefault();
-                if (target != null) __result = target;
-                return false;
+                if (__instance.Player != PlayerControl.LocalPlayer) return;
+                if (ElysiumModMenuGUI.endlessVentTime) __instance.inVentTimeRemaining = float.MaxValue;
+                if (ElysiumModMenuGUI.noVentCooldown && __instance.cooldownSecondsRemaining > 0f)
+                {
+                    __instance.cooldownSecondsRemaining = 0f;
+                    var btn = DestroyableSingleton<HudManager>.Instance?.AbilityButton;
+                    if (btn != null) { btn.ResetCoolDown(); btn.SetCooldownFill(0f); }
+                }
             }
-            catch { return true; }
         }
-    }
 
-    [HarmonyPatch(typeof(ImpostorRole), "IsValidTarget")]
-    public static class ImpostorKillAnyonePatch
-    {
-        public static void Postfix(NetworkedPlayerInfo target, ref bool __result) { try { if (NjordMenuGUI.killAnyone && target != null && target.PlayerId != PlayerControl.LocalPlayer.PlayerId && !target.IsDead) __result = true; } catch { } }
-    }
+        [HarmonyPatch(typeof(PlayerControl), "MurderPlayer")]
+        public static class KillCooldownTrackerPatch2
+        {
+            public static void Prefix(PlayerControl __instance, PlayerControl target)
+            {
+                try
+                {
+                    if (__instance == null || __instance.Data == null) return;
+                    ElysiumModMenuGUI.lastKillTimestamps[__instance.PlayerId] = Time.time;
+
+                    if (!ElysiumModMenuGUI.spamReportBodies) return;
+                    if (PlayerControl.LocalPlayer == null || PlayerControl.LocalPlayer.Data == null || PlayerControl.LocalPlayer.Data.IsDead) return;
+                    if (target == null || target.Data == null || !target.Data.IsDead) return;
+
+                    PlayerControl.LocalPlayer.CmdReportDeadBody(target.Data);
+                }
+                catch { }
+            }
+        }
+
+        [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetKillTimer))]
+        public static class KillAuraNoKillCooldownPatch
+        {
+            public static void Prefix(PlayerControl __instance, ref float time)
+            {
+                try
+                {
+                    if (!ElysiumModMenuGUI.noKillCooldownHostOnly) return;
+                    if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                    if (__instance != PlayerControl.LocalPlayer) return;
+                    time = 0f;
+                }
+                catch { }
+            }
+        }
+
+        [HarmonyPatch(typeof(ScientistRole), "Update")]
+        public static class ScientistCheatsPatch
+        {
+            public static void Postfix(ScientistRole __instance)
+            {
+                if (__instance.Player != PlayerControl.LocalPlayer) return;
+                if (ElysiumModMenuGUI.noVitalsCooldown) __instance.currentCooldown = 0f;
+                if (ElysiumModMenuGUI.endlessBattery) __instance.currentCharge = float.MaxValue;
+            }
+        }
+
+        [HarmonyPatch(typeof(ShapeshifterRole), "FixedUpdate")]
+        public static class ShapeshifterDurationPatch
+        {
+            public static void Postfix(ShapeshifterRole __instance) { if (__instance.Player == PlayerControl.LocalPlayer && ElysiumModMenuGUI.endlessSsDuration) __instance.durationSecondsRemaining = float.MaxValue; }
+        }
+
+        [HarmonyPatch(typeof(ImpostorRole), "FindClosestTarget")]
+        public static class ImpostorRangePatch
+        {
+            public static bool Prefix(ImpostorRole __instance, ref PlayerControl __result)
+            {
+                if (!ElysiumModMenuGUI.killReach) return true;
+                try
+                {
+                    var target = PlayerControl.AllPlayerControls.ToArray()
+                        .Where(p => p != null && __instance.IsValidTarget(p.Data) && !p.Data.IsDead && !p.Data.Disconnected)
+                        .OrderBy(p => Vector2.Distance(p.transform.position, PlayerControl.LocalPlayer.transform.position))
+                        .FirstOrDefault();
+                    if (target != null) __result = target;
+                    return false;
+                }
+                catch { return true; }
+            }
+        }
+
+        [HarmonyPatch(typeof(ImpostorRole), "IsValidTarget")]
+        public static class ImpostorKillAnyonePatch
+        {
+            public static void Postfix(NetworkedPlayerInfo target, ref bool __result) { try { if (ElysiumModMenuGUI.killAnyone && target != null && target.PlayerId != PlayerControl.LocalPlayer.PlayerId && !target.IsDead) __result = true; } catch { } }
+        }
 
         private void teleportToPlayer(PlayerControl t)
         {
@@ -7240,54 +7651,54 @@ if (PlayerControl.LocalPlayer != null)
         }
 
         [HarmonyPatch(typeof(DetectiveRole), "FindClosestTarget")]
-    public static class DetectiveRangePatch
-    {
-        public static bool Prefix(DetectiveRole __instance, ref PlayerControl __result)
+        public static class DetectiveRangePatch
         {
-            if (!NjordMenuGUI.UnlimitedInterrogateRange) return true;
-            try
+            public static bool Prefix(DetectiveRole __instance, ref PlayerControl __result)
             {
-                var target = PlayerControl.AllPlayerControls.ToArray()
-                    .Where(p => p != null && __instance.IsValidTarget(p.Data) && !p.Data.IsDead && !p.Data.Disconnected)
-                    .OrderBy(p => Vector2.Distance(p.transform.position, PlayerControl.LocalPlayer.transform.position))
-                    .FirstOrDefault();
-                if (target != null) __result = target;
+                if (!ElysiumModMenuGUI.UnlimitedInterrogateRange) return true;
+                try
+                {
+                    var target = PlayerControl.AllPlayerControls.ToArray()
+                        .Where(p => p != null && __instance.IsValidTarget(p.Data) && !p.Data.IsDead && !p.Data.Disconnected)
+                        .OrderBy(p => Vector2.Distance(p.transform.position, PlayerControl.LocalPlayer.transform.position))
+                        .FirstOrDefault();
+                    if (target != null) __result = target;
+                    return false;
+                }
+                catch { return true; }
+            }
+        }
+
+        [HarmonyPatch(typeof(DoorBreakerGame), nameof(DoorBreakerGame.Start))]
+        public static class DoorBreakerGame_Start_Patch
+        {
+            public static bool Prefix(DoorBreakerGame __instance)
+            {
+                if (!ElysiumModMenuGUI.autoOpenDoors) return true;
+                try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Doors, (byte)(__instance.MyDoor.Id | 64)); } catch { }
+                __instance.MyDoor.SetDoorway(true); __instance.Close();
                 return false;
             }
-            catch { return true; }
         }
-    }
-
-    [HarmonyPatch(typeof(DoorBreakerGame), nameof(DoorBreakerGame.Start))]
-    public static class DoorBreakerGame_Start_Patch
-    {
-        public static bool Prefix(DoorBreakerGame __instance)
+        [HarmonyPatch(typeof(DoorCardSwipeGame), nameof(DoorCardSwipeGame.Begin))]
+        public static class DoorCardSwipeGame_Begin_Patch
         {
-            if (!NjordMenuGUI.autoOpenDoors) return true;
-            try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Doors, (byte)(__instance.MyDoor.Id | 64)); } catch { }
-            __instance.MyDoor.SetDoorway(true); __instance.Close();
-            return false;
+            public static bool Prefix(DoorCardSwipeGame __instance)
+            {
+                if (!ElysiumModMenuGUI.autoOpenDoors) return true;
+                try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Doors, (byte)(__instance.MyDoor.Id | 64)); } catch { }
+                __instance.MyDoor.SetDoorway(true); __instance.Close();
+                return false;
+            }
         }
-    }
-    [HarmonyPatch(typeof(DoorCardSwipeGame), nameof(DoorCardSwipeGame.Begin))]
-    public static class DoorCardSwipeGame_Begin_Patch
-    {
-        public static bool Prefix(DoorCardSwipeGame __instance)
+        [HarmonyPatch(typeof(MushroomDoorSabotageMinigame), nameof(MushroomDoorSabotageMinigame.Begin))]
+        public static class MushroomDoorSabotageMinigame_Begin_Patch
         {
-            if (!NjordMenuGUI.autoOpenDoors) return true;
-            try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.Doors, (byte)(__instance.MyDoor.Id | 64)); } catch { }
-            __instance.MyDoor.SetDoorway(true); __instance.Close();
-            return false;
+            public static bool Prefix(MushroomDoorSabotageMinigame __instance) { if (ElysiumModMenuGUI.autoOpenDoors) { __instance.FixDoorAndCloseMinigame(); return false; } return true; }
         }
-    }
-    [HarmonyPatch(typeof(MushroomDoorSabotageMinigame), nameof(MushroomDoorSabotageMinigame.Begin))]
-    public static class MushroomDoorSabotageMinigame_Begin_Patch
-    {
-        public static bool Prefix(MushroomDoorSabotageMinigame __instance) { if (NjordMenuGUI.autoOpenDoors) { __instance.FixDoorAndCloseMinigame(); return false; } return true; }
-    }
 
-    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetTasks))]
-    public static class NoTaskMode_Patch { public static bool Prefix(PlayerControl __instance) { if (NjordMenuGUI.noTaskMode) return false; return true; } }
+        [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetTasks))]
+        public static class NoTaskMode_Patch { public static bool Prefix(PlayerControl __instance) { if (ElysiumModMenuGUI.noTaskMode) return false; return true; } }
         [HarmonyPatch(typeof(ChatController), nameof(ChatController.SendChat))]
         public static class ChatController_SendChat_Patch
         {
@@ -7297,30 +7708,30 @@ if (PlayerControl.LocalPlayer != null)
                 string text = __instance.freeChatField.textArea.text;
                 if (string.IsNullOrWhiteSpace(text)) return true;
 
-                if (NjordMenuGUI.enableChatHistory)
+                if (ElysiumModMenuGUI.enableChatHistory)
                 {
                     ChatHistory.Remember(text);
                 }
 
-                NjordMenuGUI.TrySpellCheckNotify(text);
+                ElysiumModMenuGUI.TrySpellCheckNotify(text);
 
                 string lowerChat = text.ToLower().Trim();
 
-                if (NjordMenuGUI.enableColorCommand)
+                if (ElysiumModMenuGUI.enableColorCommand)
                 {
                     if (lowerChat == "/rainbow" || lowerChat == "!rainbow" || lowerChat == "/lgbt" || lowerChat == "!lgbt")
                     {
                         if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                         {
-                            if (NjordMenuGUI.rainbowPlayers.Contains(PlayerControl.LocalPlayer.PlayerId))
+                            if (ElysiumModMenuGUI.rainbowPlayers.Contains(PlayerControl.LocalPlayer.PlayerId))
                             {
-                                NjordMenuGUI.rainbowPlayers.Remove(PlayerControl.LocalPlayer.PlayerId);
-                                NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВЫКЛ.");
+                                ElysiumModMenuGUI.rainbowPlayers.Remove(PlayerControl.LocalPlayer.PlayerId);
+                                ElysiumModMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВЫКЛ.");
                             }
                             else
                             {
-                                NjordMenuGUI.rainbowPlayers.Add(PlayerControl.LocalPlayer.PlayerId);
-                                NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВКЛ.");
+                                ElysiumModMenuGUI.rainbowPlayers.Add(PlayerControl.LocalPlayer.PlayerId);
+                                ElysiumModMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Ваша радуга ВКЛ.");
                             }
                         }
                         else
@@ -7341,7 +7752,7 @@ if (PlayerControl.LocalPlayer != null)
                             int colorId = -1;
 
                             if (int.TryParse(arg, out int parsed)) colorId = parsed;
-                            else colorId = NjordMenuGUI.GetColorIdByName(arg);
+                            else colorId = ElysiumModMenuGUI.GetColorIdByName(arg);
 
                             if (colorId >= 0 && colorId <= 18 && PlayerControl.LocalPlayer != null)
                             {
@@ -7368,7 +7779,7 @@ if (PlayerControl.LocalPlayer != null)
                     string[] parts = text.Split(new char[] { ' ' }, 3);
                     if (parts.Length >= 3)
                     {
-                        
+
                         string targetInput = parts[1].ToLower().Trim();
                         string message = parts[2];
                         PlayerControl target = null;
@@ -7389,7 +7800,7 @@ if (PlayerControl.LocalPlayer != null)
 
                                 string rawName = Regex.Replace(pc.Data.PlayerName, "<.*?>", string.Empty).ToLower().Trim();
                                 int cId = (int)pc.Data.DefaultOutfit.ColorId;
-                                int targetColorId = NjordMenuGUI.GetColorIdByName(targetInput);
+                                int targetColorId = ElysiumModMenuGUI.GetColorIdByName(targetInput);
 
                                 if (rawName == targetInput || (targetColorId != -1 && cId == targetColorId))
                                 {
@@ -7436,9 +7847,9 @@ if (PlayerControl.LocalPlayer != null)
         public static void Postfix(GameStartManager __instance)
         {
             if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || PlayerControl.LocalPlayer == null) return;
-            if (NjordMenuGUI.customStartTimer > 0f) return;
+            if (ElysiumModMenuGUI.customStartTimer > 0f) return;
 
-            if (NjordMenuGUI.fakeStartCounterTroll)
+            if (ElysiumModMenuGUI.fakeStartCounterTroll)
             {
                 try
                 {
@@ -7449,7 +7860,7 @@ if (PlayerControl.LocalPlayer != null)
                 }
                 catch { }
             }
-            else if (NjordMenuGUI.fakeStartCounterCustom && int.TryParse(NjordMenuGUI.fakeStartInput, out int custom))
+            else if (ElysiumModMenuGUI.fakeStartCounterCustom && int.TryParse(ElysiumModMenuGUI.fakeStartInput, out int custom))
             {
                 try
                 {
@@ -7514,7 +7925,7 @@ public static class GameManager_CheckTaskCompletion_Patch
     {
         try
         {
-            if (!NjordMenuGUI.neverEndGame) return true;
+            if (!ElysiumModMenuGUI.neverEndGame) return true;
             __result = false; return false;
         }
         catch { return true; }
@@ -7526,7 +7937,7 @@ public static class ChatController_SetVisible_Patch
 {
     public static void Prefix(ref bool visible)
     {
-        if (NjordMenuGUI.alwaysChat) visible = true;
+        if (ElysiumModMenuGUI.alwaysChat) visible = true;
     }
 }
 
@@ -7536,7 +7947,7 @@ public static class RevealVotesPatch
     internal static List<int> _votedPlayers = new List<int>();
     public static void Prefix(MeetingHud __instance)
     {
-        if (!NjordMenuGUI.RevealVotesEnabled) return;
+        if (!ElysiumModMenuGUI.RevealVotesEnabled) return;
         try
         {
             if ((int)__instance.state >= 4) return;
@@ -7569,7 +7980,7 @@ public static class RevealVotesCleanupPatch
 {
     public static void Prefix(MeetingHud __instance)
     {
-        if (!NjordMenuGUI.RevealVotesEnabled) return;
+        if (!ElysiumModMenuGUI.RevealVotesEnabled) return;
         try
         {
             foreach (var item in __instance.playerStates)
@@ -7595,7 +8006,7 @@ public static class NumberOption_Increase_Patch
     {
         try
         {
-            if (!NjordMenuGUI.noSettingLimit) return true;
+            if (!ElysiumModMenuGUI.noSettingLimit) return true;
             if (GameOptionsManager.Instance.CurrentGameOptions.GameMode != GameModes.HideNSeek &&
                 (__instance.Title == StringNames.GameNumImpostors || __instance.Title == StringNames.GamePlayerSpeed))
                 return true;
@@ -7616,7 +8027,7 @@ public static class NumberOption_Decrease_Patch
     {
         try
         {
-            if (!NjordMenuGUI.noSettingLimit) return true;
+            if (!ElysiumModMenuGUI.noSettingLimit) return true;
             if (GameOptionsManager.Instance.CurrentGameOptions.GameMode != GameModes.HideNSeek &&
                 (__instance.Title == StringNames.GameNumImpostors || __instance.Title == StringNames.GamePlayerSpeed))
                 return true;
@@ -7637,7 +8048,7 @@ public static class NumberOption_Initialize_Patch
     {
         try
         {
-            if (!NjordMenuGUI.noSettingLimit) return;
+            if (!ElysiumModMenuGUI.noSettingLimit) return;
             if (GameOptionsManager.Instance.CurrentGameOptions.GameMode != GameModes.HideNSeek &&
                 (__instance.Title == StringNames.GameNumImpostors || __instance.Title == StringNames.GamePlayerSpeed))
                 return;
@@ -7654,7 +8065,7 @@ public static class IGameOptionsExtensions_GetAdjustedNumImpostors_Patch
     {
         try
         {
-            if (!NjordMenuGUI.noSettingLimit) return true;
+            if (!ElysiumModMenuGUI.noSettingLimit) return true;
             __result = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
             return false;
         }
@@ -7669,7 +8080,7 @@ public static class ExtendedLobbyListPatch
 
     public static bool Prefix(FindAGameManager __instance)
     {
-        if (!NjordMenuGUI.extendedLobby) return true;
+        if (!ElysiumModMenuGUI.extendedLobby) return true;
         try
         {
             if (__instance.gameContainers == null || __instance.gameContainers.Count == 0) return true;
@@ -7718,7 +8129,7 @@ public static class ExtendedLobbyRefreshPatch
 {
     public static void Postfix()
     {
-        try { if (NjordMenuGUI.extendedLobby && ExtendedLobbyListPatch.scroller != null) ExtendedLobbyListPatch.scroller.ScrollRelative(new Vector2(0f, -100f)); } catch { }
+        try { if (ElysiumModMenuGUI.extendedLobby && ExtendedLobbyListPatch.scroller != null) ExtendedLobbyListPatch.scroller.ScrollRelative(new Vector2(0f, -100f)); } catch { }
     }
 }
 
@@ -7778,28 +8189,28 @@ public static class InvertControls_Patch
 
     public static void Postfix(PlayerPhysics __instance)
     {
-        if (__instance.AmOwner && NjordMenuGUI.invertControls && __instance.body != null)
+        if (__instance.AmOwner && ElysiumModMenuGUI.invertControls && __instance.body != null)
         {
             __instance.body.velocity = -__instance.body.velocity;
         }
 
         SeePlayerVent(__instance);
-        }
     }
-    [HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.Start))]
-    public static class LobbyStart_ApplyLevelSpoof
+}
+[HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.Start))]
+public static class LobbyStart_ApplyLevelSpoof
+{
+    public static void Postfix()
     {
-        public static void Postfix()
+        if (!ElysiumModMenuGUI.isEditingLevel && uint.TryParse(ElysiumModMenuGUI.spoofLevelString, out uint parsedLvl))
         {
-            if (!NjordMenuGUI.isEditingLevel && uint.TryParse(NjordMenuGUI.spoofLevelString, out uint parsedLvl))
-            {
-                uint targetLevel = parsedLvl > 0 ? parsedLvl - 1 : 0;
-                try { AmongUs.Data.DataManager.Player.stats.level = targetLevel; }
-                catch { try { AmongUs.Data.DataManager.Player.Stats.Level = targetLevel; } catch { } }
-                AmongUs.Data.DataManager.Player.Save();
-            }
+            uint targetLevel = parsedLvl > 0 ? parsedLvl - 1 : 0;
+            try { AmongUs.Data.DataManager.Player.stats.level = targetLevel; }
+            catch { try { AmongUs.Data.DataManager.Player.Stats.Level = targetLevel; } catch { } }
+            AmongUs.Data.DataManager.Player.Save();
         }
     }
+}
 
 [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.HandleRpc))]
 public static class RPCSniffer_Patch
@@ -7845,32 +8256,32 @@ public static class RPCSniffer_Patch
             { 255, ("CrewMod", "#FFFF00") },
             { 111, ("AUM (BitCrackers)", "#FF0000") },
             { 231, ("SentinelAU", "#FF0000") },
-            { 133, ("Lunar / NjordMenu", "#00FFFF") },
-            { 89,  ("Njord Menu Old", "#008000") }
+            { 133, ("Lunar / ElysiumModMenu", "#00FFFF") },
+            { 89,  ("ElysiumModMenu Old", "#008000") }
         };
 
     public static bool Prefix(PlayerControl __instance, byte callId, MessageReader reader)
     {
         if (__instance == null) return true;
 
-       
+
         if (PlayerControl.LocalPlayer != null && __instance == PlayerControl.LocalPlayer) return true;
 
-        if (NjordMenuGUI.LogAllRPCs)
+        if (ElysiumModMenuGUI.LogAllRPCs)
         {
-            
+
             if (!VanillaRPCs.Contains(callId))
             {
                 string pNameSniff = (__instance.Data != null && !string.IsNullOrEmpty(__instance.Data.PlayerName)) ? __instance.Data.PlayerName : $"Player_{__instance.PlayerId}";
 
-                
+
                 if (KnownMods.TryGetValue(callId, out var modInfo))
                 {
-                    NjordMenuGUI.ShowNotification($"<color=#00FFFF>[СНИФФЕР]</color> <b>{pNameSniff}</b>: <b><color={modInfo.Color}>{modInfo.Name}</color></b> <color=#FFFF00>({callId})</color>");
+                    ElysiumModMenuGUI.ShowNotification($"<color=#00FFFF>[СНИФФЕР]</color> <b>{pNameSniff}</b>: <b><color={modInfo.Color}>{modInfo.Name}</color></b> <color=#FFFF00>({callId})</color>");
                 }
                 else
                 {
-                    NjordMenuGUI.ShowNotification($"<color=#00FFFF>[СНИФФЕР]</color> <b>{pNameSniff}</b> кинул неизвестный RPC: <color=#FFFF00>{callId}</color>");
+                    ElysiumModMenuGUI.ShowNotification($"<color=#00FFFF>[СНИФФЕР]</color> <b>{pNameSniff}</b> кинул неизвестный RPC: <color=#FFFF00>{callId}</color>");
                 }
             }
         }
@@ -7883,7 +8294,7 @@ public static class UnlockCosmetics_HatManager_Initialize_Postfix
 {
     public static void Postfix(HatManager __instance)
     {
-        if (!NjordMenuGUI.unlockCosmetics) return;
+        if (!ElysiumModMenuGUI.unlockCosmetics) return;
 
         foreach (var bundle in __instance.allBundles) bundle.Free = true;
         foreach (var hat in __instance.allHats) hat.Free = true;
@@ -7900,7 +8311,7 @@ public static class UnlockCosmetics_PlayerPurchasesData_GetPurchase_Prefix
 {
     public static bool Prefix(ref bool __result)
     {
-        if (!NjordMenuGUI.unlockCosmetics) return true;
+        if (!ElysiumModMenuGUI.unlockCosmetics) return true;
         __result = true;
         return false;
     }
@@ -7910,12 +8321,12 @@ public static class AutoChatEveryone_Start_Patch
 {
     public static void Postfix()
     {
-        NjordMenuGUI.InitializeKillCooldownOnRoundStart();
+        ElysiumModMenuGUI.InitializeKillCooldownOnRoundStart();
 
-        if (NjordMenuGUI.autoChatEveryone && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+        if (ElysiumModMenuGUI.autoChatEveryone && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
         {
-            NjordMenuGUI.pendingAutoMeeting = true;
-            NjordMenuGUI.autoMeetingTimer = 0f;
+            ElysiumModMenuGUI.pendingAutoMeeting = true;
+            ElysiumModMenuGUI.autoMeetingTimer = 0f;
         }
     }
 }
@@ -7927,7 +8338,7 @@ public static class ChatController_AddChat_Patch
         if (string.IsNullOrEmpty(chatText)) return true;
         string lowerText = chatText.ToLower().Trim();
 
-        if (NjordMenuGUI.enableColorCommand && sourcePlayer != null)
+        if (ElysiumModMenuGUI.enableColorCommand && sourcePlayer != null)
         {
             string[] colorCommands = { "/color ", "!color ", "/col ", "!col ", "/c ", "!c " };
             string usedCmd = colorCommands.FirstOrDefault(cmd => lowerText.StartsWith(cmd));
@@ -7940,11 +8351,11 @@ public static class ChatController_AddChat_Patch
                     int colorId = -1;
 
                     if (int.TryParse(colorInput, out int parsedId)) { if (parsedId >= 0 && parsedId <= 18) colorId = parsedId; }
-                    else colorId = NjordMenuGUI.GetColorIdByName(colorInput);
+                    else colorId = ElysiumModMenuGUI.GetColorIdByName(colorInput);
 
                     if (colorId != -1)
                     {
-                        if (colorId == 18 && NjordMenuGUI.blockFortegreenChat)
+                        if (colorId == 18 && ElysiumModMenuGUI.blockFortegreenChat)
                         {
                             if (HudManager.Instance?.Chat != null)
                                 HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Цвет Fortegreen запрещен хостом!");
@@ -7966,22 +8377,22 @@ public static class ChatController_AddChat_Patch
             {
                 if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                 {
-                    if (NjordMenuGUI.blockRainbowChat)
+                    if (ElysiumModMenuGUI.blockRainbowChat)
                     {
                         if (HudManager.Instance?.Chat != null)
                             HudManager.Instance.Chat.AddChat(PlayerControl.LocalPlayer, "<color=#FF0000>[ОШИБКА]</color> Радуга запрещена хостом!");
                     }
                     else
                     {
-                        if (NjordMenuGUI.rainbowPlayers.Contains(sourcePlayer.PlayerId))
+                        if (ElysiumModMenuGUI.rainbowPlayers.Contains(sourcePlayer.PlayerId))
                         {
-                            NjordMenuGUI.rainbowPlayers.Remove(sourcePlayer.PlayerId);
-                            NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВЫКЛ.");
+                            ElysiumModMenuGUI.rainbowPlayers.Remove(sourcePlayer.PlayerId);
+                            ElysiumModMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВЫКЛ.");
                         }
                         else
                         {
-                            NjordMenuGUI.rainbowPlayers.Add(sourcePlayer.PlayerId);
-                            NjordMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВКЛ.");
+                            ElysiumModMenuGUI.rainbowPlayers.Add(sourcePlayer.PlayerId);
+                            ElysiumModMenuGUI.ShowNotification("<color=#FF00FF>[SERVER]</color> Радуга ВКЛ.");
                         }
                     }
                 }
@@ -7996,9 +8407,9 @@ public static class ChatController_AddChat_Patch
     public static void Postfix(GameStartManager __instance)
     {
         if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || PlayerControl.LocalPlayer == null) return;
-        if (NjordMenuGUI.customStartTimer > 0f) return;
+        if (ElysiumModMenuGUI.customStartTimer > 0f) return;
 
-        if (NjordMenuGUI.fakeStartCounterTroll)
+        if (ElysiumModMenuGUI.fakeStartCounterTroll)
         {
             try
             {
@@ -8009,7 +8420,7 @@ public static class ChatController_AddChat_Patch
             }
             catch { }
         }
-        else if (NjordMenuGUI.fakeStartCounterCustom && int.TryParse(NjordMenuGUI.fakeStartInput, out int custom))
+        else if (ElysiumModMenuGUI.fakeStartCounterCustom && int.TryParse(ElysiumModMenuGUI.fakeStartInput, out int custom))
         {
             try
             {
@@ -8026,14 +8437,14 @@ public static class MoreLobbyInfo_GameContainer_SetupGameInfo_Postfix
 {
     public static void Postfix(GameContainer __instance)
     {
-        if (!NjordMenuGUI.moreLobbyInfo) return;
+        if (!ElysiumModMenuGUI.moreLobbyInfo) return;
 
         var trueHostName = __instance.gameListing.TrueHostName;
         const string separator = "<#0000>000000000000000</color>";
         var age = __instance.gameListing.Age;
         var lobbyTime = $"Age: {age / 60}:{(age % 60 < 10 ? "0" : "")}{age % 60}";
 
-        
+
         int platId = (int)__instance.gameListing.Platform;
         string platformStr = platId switch
         {
@@ -8051,7 +8462,7 @@ public static class MoreLobbyInfo_GameContainer_SetupGameInfo_Postfix
             _ => "Unknown"
         };
 
-        string hexColor = ColorUtility.ToHtmlStringRGB(NjordMenuGUI.currentAccentColor);
+        string hexColor = ColorUtility.ToHtmlStringRGB(ElysiumModMenuGUI.currentAccentColor);
 
         __instance.capacity.text = $"<size=40%>{separator}\n{trueHostName}\n{__instance.capacity.text}\n" +
                                    $"<color=#{hexColor}>{GameCode.IntToGameName(__instance.gameListing.GameId)}</color>\n" +
@@ -8064,7 +8475,7 @@ public static class MoreLobbyInfo_FindAGameManager_HandleList_Postfix
 {
     public static void Postfix(HttpMatchmakerManager.FindGamesListFilteredResponse response, FindAGameManager __instance)
     {
-        if (!NjordMenuGUI.moreLobbyInfo) return;
+        if (!ElysiumModMenuGUI.moreLobbyInfo) return;
 
         __instance.TotalText.text = response.Metadata.AllGamesCount.ToString();
     }
@@ -8078,11 +8489,11 @@ public static class PlatformSpooferPatch
         {
             if (__instance != null)
             {
-                if (NjordMenuGUI.enablePlatformSpoof)
+                if (ElysiumModMenuGUI.enablePlatformSpoof)
                 {
-                    __instance.Platform = NjordMenuGUI.platformValues[NjordMenuGUI.currentPlatformIndex];
+                    __instance.Platform = ElysiumModMenuGUI.platformValues[ElysiumModMenuGUI.currentPlatformIndex];
                 }
-                __instance.PlatformName = "NjordMenu by Meowchelo (and one <color=#FFA500>silly</color> guy :p) https://github.com/meowchelo/NjordMenu";
+                __instance.PlatformName = "ElysiumModMenu by Meowchelo (and one <color=#FFA500>silly</color> guy :p) https://github.com/meowchelo/ElysiumModMenu";
             }
         }
         catch { }
@@ -8092,15 +8503,19 @@ public static class PlatformSpooferPatch
 [HarmonyPatch(typeof(NetworkedPlayerInfo), nameof(NetworkedPlayerInfo.Serialize))]
 public static class FriendCodeSpooferPatch
 {
+    private static string serializeRestoreValue = null;
+
     public static void Prefix(NetworkedPlayerInfo __instance)
     {
         try
         {
-            if (!NjordMenuGUI.enableFriendCodeSpoof) return;
+            serializeRestoreValue = null;
+            if (ElysiumModMenuGUI.PrepareLocalFriendCodeForSerialize(__instance, out serializeRestoreValue)) return;
+            if (!ElysiumModMenuGUI.enableFriendCodeSpoof) return;
             if (__instance == null || PlayerControl.LocalPlayer == null || PlayerControl.LocalPlayer.Data == null) return;
             if (__instance.PlayerId != PlayerControl.LocalPlayer.PlayerId) return;
 
-            string input = NjordMenuGUI.spoofFriendCodeInput ?? "";
+            string input = ElysiumModMenuGUI.spoofFriendCodeInput ?? "";
             string clean = "";
             foreach (char c in input.ToLowerInvariant())
             {
@@ -8113,6 +8528,12 @@ public static class FriendCodeSpooferPatch
             __instance.FriendCode = clean;
         }
         catch { }
+    }
+
+    public static void Postfix(NetworkedPlayerInfo __instance)
+    {
+        ElysiumModMenuGUI.RestoreLocalFriendCodeAfterSerialize(__instance, serializeRestoreValue);
+        serializeRestoreValue = null;
     }
 }
 [HarmonyPatch(typeof(InnerNetClient), nameof(InnerNetClient.KickPlayer))]
@@ -8138,8 +8559,8 @@ public static class AmongUsClient_KickPlayer_BanList_Patch
                     }
                     catch { }
 
-                    NjordMenuGUI.AddToBanList(fc, puid, name, "Host ban");
-                    NjordMenuGUI.ShowNotification($"<color=#FF0000>[BAN]</color> {name} занесен в черный список!");
+                    ElysiumModMenuGUI.AddToBanList(fc, puid, name, "Host ban");
+                    ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[BAN]</color> {name} занесен в черный список!");
                 }
             }
             catch { }
