@@ -1,4 +1,4 @@
-# 🌊 ElysiumModMenu
+# 🌙 ElysiumModMenu
 
 **ElysiumModMenu** is an advanced **BepInEx IL2CPP mod menu for Among Us** with host tools, ESP, anti-cheat utilities, spoofing, local identity tweaks, chat QoL, and lobby automation.
 
@@ -157,12 +157,6 @@ Default menu toggle:
 
 ```text
 Insert
-```
-
-or
-
-```text
-Right Shift
 ```
 
 You can also set custom keybinds inside the menu.
