@@ -2472,12 +2472,17 @@ namespace ElysiumModMenu
             private const byte RpcGameDataTag = 2;
             private const byte DroppedGameDataTag = 0;
             private const int PasosDropNotifyLimit = 1;
-            private const float PasosWindow = 0.75f;
+            private const float PasosWindow = 0.15f;
             private const float PasosNotifyCooldown = 2f;
             private static readonly Queue<float> emptyRpcDrops = new Queue<float>();
             private static readonly HashSet<int> pasosBlockedClientIds = new HashSet<int>();
             private static float lastPasosNotify;
             private static int currentPasosClientId = -1;
+
+            public static void BeginMessageContext(int clientId)
+            {
+                currentPasosClientId = clientId;
+            }
 
             public static void SetCurrentClientId(int clientId)
             {
@@ -2523,8 +2528,9 @@ namespace ElysiumModMenu
 
                     if (!ElysiumModMenuGUI.enableHostPasosBan || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
 
+                    int banClientId = GetKickClientId(player, clientId);
                     string fc = string.IsNullOrEmpty(player?.Data?.FriendCode) ? "Unknown" : player.Data.FriendCode;
-                    string puid = clientId.ToString();
+                    string puid = banClientId.ToString();
 
                     try
                     {
@@ -2537,10 +2543,28 @@ namespace ElysiumModMenu
                     catch { }
 
                     ElysiumModMenuGUI.AddToBanList(fc, puid, pName, "Auto-banned for Pasos empty RPC spam");
-                    AmongUsClient.Instance.KickPlayer(clientId, true);
+                    AmongUsClient.Instance.KickPlayer(banClientId, true);
                     ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> <b>{pName}</b> Anti-Pasos room banned!");
                 }
                 catch { }
+            }
+
+            public static int GetKickClientId(PlayerControl player, int fallbackClientId)
+            {
+                try
+                {
+                    if (player != null)
+                    {
+                        int ownerId = (int)player.OwnerId;
+                        if (ownerId >= 0) return ownerId;
+
+                        if (player.Data != null && player.Data.ClientId >= 0)
+                            return player.Data.ClientId;
+                    }
+                }
+                catch { }
+
+                return fallbackClientId;
             }
 
             public static PlayerControl FindPlayerByClientId(int clientId)
@@ -2564,6 +2588,77 @@ namespace ElysiumModMenu
                 catch { }
 
                 return null;
+            }
+
+            public static int ResolveClientId(object source)
+            {
+                return ResolveClientId(source, 0);
+            }
+
+            private static int ResolveClientId(object source, int depth)
+            {
+                if (source == null || depth > 2 || source is MessageReader || source is SendOption) return -1;
+
+                try
+                {
+                    if (source is PlayerControl pc)
+                        return GetKickClientId(pc, -1);
+
+                    int direct = ConvertNumericClientId(source);
+                    if (direct >= 0) return direct;
+
+                    Type type = source.GetType();
+                    foreach (string name in new[] { "ClientId", "OwnerId", "Id", "clientId", "ownerId", "id" })
+                    {
+                        PropertyInfo property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        direct = ConvertNumericClientId(property?.GetValue(source));
+                        if (direct >= 0) return direct;
+
+                        FieldInfo field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        direct = ConvertNumericClientId(field?.GetValue(source));
+                        if (direct >= 0) return direct;
+                    }
+
+                    foreach (string name in new[] { "Character", "Object", "Player", "Data", "character", "player" })
+                    {
+                        PropertyInfo property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        direct = ResolveClientId(property?.GetValue(source), depth + 1);
+                        if (direct >= 0) return direct;
+
+                        FieldInfo field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        direct = ResolveClientId(field?.GetValue(source), depth + 1);
+                        if (direct >= 0) return direct;
+                    }
+                }
+                catch { }
+
+                return -1;
+            }
+
+            private static int ConvertNumericClientId(object value)
+            {
+                if (value == null) return -1;
+
+                try
+                {
+                    TypeCode code = Type.GetTypeCode(value.GetType());
+                    switch (code)
+                    {
+                        case TypeCode.Byte:
+                        case TypeCode.SByte:
+                        case TypeCode.Int16:
+                        case TypeCode.UInt16:
+                        case TypeCode.Int32:
+                        case TypeCode.UInt32:
+                        case TypeCode.Int64:
+                        case TypeCode.UInt64:
+                            long id = Convert.ToInt64(value);
+                            return id >= 0 && id < 256 ? (int)id : -1;
+                    }
+                }
+                catch { }
+
+                return -1;
             }
 
             public static void Postfix(MessageReader __result)
@@ -2617,7 +2712,7 @@ namespace ElysiumModMenu
                 try
                 {
                     int clientId = ExtractClientId(__args);
-                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
+                    Shield_PasosLimit_Patch.BeginMessageContext(clientId);
 
                     if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
                         return false;
@@ -2627,7 +2722,7 @@ namespace ElysiumModMenu
                 return true;
             }
 
-            private static int ExtractClientId(object[] args)
+            public static int ExtractClientId(object[] args)
             {
                 if (args == null) return -1;
 
@@ -2642,27 +2737,7 @@ namespace ElysiumModMenu
 
             private static int ExtractClientId(object source)
             {
-                if (source == null || source is MessageReader || source is SendOption) return -1;
-
-                try
-                {
-                    if (source is int directId) return directId;
-
-                    Type type = source.GetType();
-                    foreach (string name in new[] { "ClientId", "Id", "clientId", "id" })
-                    {
-                        PropertyInfo property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (property != null && property.PropertyType == typeof(int))
-                            return (int)property.GetValue(source);
-
-                        FieldInfo field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (field != null && field.FieldType == typeof(int))
-                            return (int)field.GetValue(source);
-                    }
-                }
-                catch { }
-
-                return -1;
+                return Shield_PasosLimit_Patch.ResolveClientId(source);
             }
         }
 
@@ -2680,11 +2755,16 @@ namespace ElysiumModMenu
 
                 try
                 {
+                    int clientId = Shield_PasosLimit_HandleMessageContext_Patch.ExtractClientId(__args);
+                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
+                    if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
+                        return false;
+
                     MessageReader parentReader = __args != null && __args.Length > 0 ? __args[0] as MessageReader : null;
                     if (parentReader == null) return true;
                     if (parentReader.Length > 0 && parentReader.BytesRemaining > 0) return true;
 
-                    Shield_PasosLimit_Patch.RecordDrop();
+                    Shield_PasosLimit_Patch.RecordDrop(clientId);
                     return false;
                 }
                 catch { }
@@ -2728,12 +2808,13 @@ namespace ElysiumModMenu
                 return true;
             }
 
-            private static int ExtractClientId(object[] args)
+            public static int ExtractClientId(object[] args)
             {
                 try
                 {
                     if (args == null || args.Length < 2 || args[1] == null) return -1;
-                    return Convert.ToInt32(args[1]);
+                    int clientId = Shield_PasosLimit_Patch.ResolveClientId(args[1]);
+                    return clientId >= 0 ? clientId : Convert.ToInt32(args[1]);
                 }
                 catch { }
 
@@ -2806,10 +2887,16 @@ namespace ElysiumModMenu
                     foreach (FieldInfo field in fields)
                     {
                         if (field.FieldType != typeof(int)) continue;
+                        string fieldName = field.Name.ToLowerInvariant();
+                        if (!fieldName.Contains("client") &&
+                            !fieldName.Contains("sender") &&
+                            !fieldName.Contains("source") &&
+                            !fieldName.Contains("player") &&
+                            !fieldName.Contains("id"))
+                            continue;
 
-                        int value = (int)field.GetValue(routine);
-                        if (value >= 0 && value < 256)
-                            return value;
+                        int value = Shield_PasosLimit_Patch.ResolveClientId(field.GetValue(routine));
+                        if (value >= 0) return value;
                     }
                 }
                 catch { }
@@ -3408,7 +3495,7 @@ namespace ElysiumModMenu
                 SaveBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 SaveBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
                 SaveBool("M_PasosLimit", enablePasosLimit);
-                SaveBool("M_HostPasosBan", enableHostPasosBan);
+                SaveBool("M_AntiPasosHostBan", enableHostPasosBan);
                 SaveBool("M_AutoHostEnabled", AutoHostEnabled);
                 SaveBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
                 SaveBool("M_AutoHostNotifications", AutoHostNotifications);
@@ -3567,7 +3654,7 @@ namespace ElysiumModMenu
                 blockChatFloodRpc = LoadBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 blockMeetingFloodRpc = LoadBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
                 enablePasosLimit = LoadBool("M_PasosLimit", enablePasosLimit);
-                enableHostPasosBan = LoadBool("M_HostPasosBan", enableHostPasosBan);
+                enableHostPasosBan = LoadBool("M_AntiPasosHostBan", enableHostPasosBan);
                 AutoHostEnabled = LoadBool("M_AutoHostEnabled", AutoHostEnabled);
                 AutoReturnLobbyAfterMatch = LoadBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
                 AutoHostNotifications = LoadBool("M_AutoHostNotifications", AutoHostNotifications);
@@ -7270,7 +7357,7 @@ namespace ElysiumModMenu
         public static bool blockChatFloodRpc = true;
         public static bool blockMeetingFloodRpc = true;
         public static bool enablePasosLimit = true;
-        public static bool enableHostPasosBan = false;
+        public static bool enableHostPasosBan = true;
         public static bool autoBanBrokenFriendCode = false;
         public static int chatRpcLimit = 1;
         public static float chatRpcWindow = 1f;
