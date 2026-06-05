@@ -2515,12 +2515,14 @@ namespace ElysiumModMenu
                 return AccessTools.Method(typeof(InnerNetClient), "HandleGameData", new[] { typeof(MessageReader) });
             }
 
-            public static bool Prefix(MessageReader parentReader)
+            public static bool Prefix(object[] __args)
             {
-                if (!ElysiumModMenuGUI.enablePasosLimit || parentReader == null) return true;
+                if (!ElysiumModMenuGUI.enablePasosLimit) return true;
 
                 try
                 {
+                    MessageReader parentReader = __args != null && __args.Length > 0 ? __args[0] as MessageReader : null;
+                    if (parentReader == null) return true;
                     if (parentReader.Length > 0 && parentReader.BytesRemaining > 0) return true;
 
                     Shield_PasosLimit_Patch.RecordDrop();
@@ -2529,6 +2531,84 @@ namespace ElysiumModMenu
                 catch { }
 
                 return true;
+            }
+        }
+
+        [HarmonyPatch]
+        public static class Shield_PasosLimit_HandleGameDataInner_Patch
+        {
+            public static MethodBase TargetMethod()
+            {
+                return AccessTools.Method(typeof(InnerNetClient), "HandleGameDataInner", new[] { typeof(MessageReader), typeof(int) });
+            }
+
+            public static bool Prefix(object[] __args, ref Il2CppSystem.Collections.IEnumerator __result)
+            {
+                if (!ElysiumModMenuGUI.enablePasosLimit) return true;
+
+                try
+                {
+                    MessageReader parentReader = __args != null && __args.Length > 0 ? __args[0] as MessageReader : null;
+                    if (parentReader == null) return true;
+                    if (parentReader.Length > 0 && parentReader.BytesRemaining > 0) return true;
+
+                    Shield_PasosLimit_Patch.RecordDrop();
+                    __result = EmptyPasosRoutine().WrapToIl2Cpp();
+                    return false;
+                }
+                catch { }
+
+                return true;
+            }
+
+            private static System.Collections.IEnumerator EmptyPasosRoutine() { yield break; }
+        }
+
+        [HarmonyPatch]
+        public static class Shield_PasosLimit_HandleGameDataInner_MoveNext_Patch
+        {
+            public static IEnumerable<MethodBase> TargetMethods()
+            {
+                foreach (Type nestedType in typeof(InnerNetClient).GetNestedTypes(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                {
+                    if (!nestedType.Name.Contains("HandleGameDataInner")) continue;
+
+                    MethodInfo moveNext = AccessTools.Method(nestedType, "MoveNext");
+                    if (moveNext != null)
+                        yield return moveNext;
+                }
+            }
+
+            public static bool Prefix(object __instance, ref bool __result)
+            {
+                if (!ElysiumModMenuGUI.enablePasosLimit || __instance == null) return true;
+
+                try
+                {
+                    if (!HasEmptyGameDataReader(__instance)) return true;
+
+                    Shield_PasosLimit_Patch.RecordDrop();
+                    __result = false;
+                    return false;
+                }
+                catch { }
+
+                return true;
+            }
+
+            private static bool HasEmptyGameDataReader(object routine)
+            {
+                FieldInfo[] fields = routine.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                foreach (FieldInfo field in fields)
+                {
+                    if (!typeof(MessageReader).IsAssignableFrom(field.FieldType)) continue;
+
+                    MessageReader reader = field.GetValue(routine) as MessageReader;
+                    if (reader != null && reader.Length <= 0 && reader.BytesRemaining <= 0)
+                        return true;
+                }
+
+                return false;
             }
         }
 
