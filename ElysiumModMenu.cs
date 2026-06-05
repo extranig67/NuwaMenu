@@ -289,10 +289,9 @@ namespace ElysiumModMenu
         {
             public static void Postfix(TextBoxTMP __instance)
             {
-                __instance.allowAllCharacters = true;
-                __instance.AllowSymbols = true;
-
-                __instance.AllowEmail = true;
+                __instance.allowAllCharacters = ElysiumModMenuGUI.allowLinksAndSymbols;
+                __instance.AllowSymbols = ElysiumModMenuGUI.allowLinksAndSymbols;
+                __instance.AllowEmail = ElysiumModMenuGUI.allowLinksAndSymbols;
             }
         }
         [HarmonyPatch(typeof(ChatController), nameof(ChatController.Update))]
@@ -307,9 +306,9 @@ namespace ElysiumModMenu
                     __instance.timeSinceLastMessage = 0.9f;
                 }
 
-                __instance.freeChatField.textArea.allowAllCharacters = true;
-                __instance.freeChatField.textArea.AllowSymbols = true;
-                __instance.freeChatField.textArea.AllowEmail = true;
+                __instance.freeChatField.textArea.allowAllCharacters = ElysiumModMenuGUI.allowLinksAndSymbols;
+                __instance.freeChatField.textArea.AllowSymbols = ElysiumModMenuGUI.allowLinksAndSymbols;
+                __instance.freeChatField.textArea.AllowEmail = ElysiumModMenuGUI.allowLinksAndSymbols;
 
                 __instance.freeChatField.textArea.characterLimit = ElysiumModMenuGUI.enableExtendedChat ? 120 : 100;
             }
@@ -692,7 +691,7 @@ namespace ElysiumModMenu
             GUILayout.Space(2);
             enableFastChat = DrawToggle(enableFastChat, L("Fast Chat (3.1 to 2.1", "Быстрый чат (c 3.1 до 2.1)"), 280);
             GUILayout.Space(2);
-            allowLinksAndSymbols = DrawToggle(allowLinksAndSymbols, L("Allow Links & Symbols", "Разрешить ссылки и символы"), 280);
+            allowLinksAndSymbols = DrawToggle(allowLinksAndSymbols, L("Unlock Extra Characters", "Разрешить все символы"), 280);
             GUILayout.Space(2);
             enableSpellCheck = DrawToggle(enableSpellCheck, L("Spell Check (Basic)", "Проверка орфографии (Базовая)"), 280);
             GUILayout.EndVertical();
@@ -2185,7 +2184,7 @@ namespace ElysiumModMenu
         public static byte currentColorId = 0;
         private Vector2 playerListScrollPos = Vector2.zero;
         private Vector2 playerActionScrollPos = Vector2.zero;
-        private byte selectedHydraPlayerId = 255;
+        private byte selectedAntiCheatPlayerId = 255;
 
         public static string spoofLevelString = "100";
         public static string customNameInput = "хыхых";
@@ -2308,7 +2307,7 @@ namespace ElysiumModMenu
 
         public static bool killReach = false, killAnyone = false;
         public static bool endlessSsDuration = false, noVitalsCooldown = false;
-        public static bool endlessBattery = false, endlessVentTime = false, noVentCooldown = false;
+        public static bool endlessBattery = false, endlessVentTime = false, noVentCooldown = false, noMapCooldowns = false;
         public static bool reactorSab = false, oxygenSab = false, commsSab = false, elecSab = false;
         public static bool autoOpenDoors = false;
         public static bool moonWalk = false;
@@ -2923,6 +2922,7 @@ namespace ElysiumModMenu
                 SaveBool("M_CameraZoom", cameraZoom);
                 SaveBool("M_RevealVotes", RevealVotesEnabled);
                 SaveBool("M_NoTaskMode", noTaskMode);
+                SaveBool("M_NoMapCooldowns", noMapCooldowns);
                 SaveBool("M_NeverEndGame", neverEndGame);
                 SaveBool("M_RemovePenalty", removePenalty);
                 SaveBool("M_AlwaysShowLobbyTimer", alwaysShowLobbyTimer);
@@ -3077,6 +3077,7 @@ namespace ElysiumModMenu
                 cameraZoom = LoadBool("M_CameraZoom", cameraZoom);
                 RevealVotesEnabled = LoadBool("M_RevealVotes", RevealVotesEnabled);
                 noTaskMode = LoadBool("M_NoTaskMode", noTaskMode);
+                noMapCooldowns = LoadBool("M_NoMapCooldowns", noMapCooldowns);
                 neverEndGame = LoadBool("M_NeverEndGame", neverEndGame);
                 removePenalty = LoadBool("M_RemovePenalty", removePenalty);
                 alwaysShowLobbyTimer = LoadBool("M_AlwaysShowLobbyTimer", alwaysShowLobbyTimer);
@@ -3720,7 +3721,7 @@ namespace ElysiumModMenu
                 GUILayout.Label($"<b><color=#{safeHex}>{L("Make sure you are using the latest version from GitHub releases.", "Убедитесь, что используете последнюю версию из GitHub releases.")}</color></b>", textStyle);
                 GUILayout.Space(8);
                 GUILayout.Label($"<b><color=#{accentHex}>{L("Quick Hotkeys", "Быстрые клавиши")}</color></b>", textStyle);
-                GUILayout.Label(L("Insert / Right Shift: open or close menu", "Insert / Right Shift: открыть или закрыть меню"), textStyle);
+                GUILayout.Label(L("Insert: open or close menu", "Insert: открыть или закрыть меню"), textStyle);
                 GUILayout.Label(L("Right Click: teleport to cursor", "ПКМ: телепорт к курсору"), textStyle);
                 GUILayout.Label(L("F9: magnet cursor", "F9: магнит курсора"), textStyle);
                 GUILayout.EndVertical();
@@ -3937,6 +3938,8 @@ namespace ElysiumModMenu
             GUILayout.Space(3);
             noVentCooldown = DrawToggle(noVentCooldown, "No Vent Cooldown", 230);
             GUILayout.Space(3);
+            noMapCooldowns = DrawToggle(noMapCooldowns, "No Map Cooldowns", 230);
+            GUILayout.Space(3);
             endlessBattery = DrawToggle(endlessBattery, "Endless Battery", 230);
             GUILayout.Space(3);
             noVitalsCooldown = DrawToggle(noVitalsCooldown, "No Vitals Cooldown", 230);
@@ -3959,7 +3962,7 @@ namespace ElysiumModMenu
             GUILayout.Space(3);
             enableFastChat = DrawToggle(enableFastChat, L("Fast Chat", "Быстрый чат"), 230);
             GUILayout.Space(3);
-            allowLinksAndSymbols = DrawToggle(allowLinksAndSymbols, L("Links & Symbols", "Ссылки и символы"), 230);
+            allowLinksAndSymbols = DrawToggle(allowLinksAndSymbols, L("Unlock Extra Characters", "Все символы"), 230);
             GUILayout.Space(3);
             enableSpellCheck = DrawToggle(enableSpellCheck, L("Spell Check", "Проверка орфографии"), 230);
 
@@ -4570,14 +4573,14 @@ namespace ElysiumModMenu
                     if (forcedPreGameRoles.ContainsKey(pc.PlayerId)) pName += " [*]";
                     else if (forcedImpostors.Contains(pc.PlayerId)) pName += " [Imp]";
 
-                    bool isSelected = selectedHydraPlayerId == pc.PlayerId;
+                    bool isSelected = selectedAntiCheatPlayerId == pc.PlayerId;
 
                     GUI.contentColor = Color.white;
                     try { GUI.contentColor = Palette.PlayerColors[pc.Data.DefaultOutfit.ColorId]; } catch { }
 
                     if (GUILayout.Button(pName, isSelected ? activeTabStyle : btnStyle, GUILayout.Height(30)))
                     {
-                        selectedHydraPlayerId = pc.PlayerId;
+                        selectedAntiCheatPlayerId = pc.PlayerId;
                     }
                     GUI.contentColor = Color.white;
                 }
@@ -4588,7 +4591,7 @@ namespace ElysiumModMenu
             GUILayout.BeginVertical(boxStyle, GUILayout.ExpandWidth(true));
             playerActionScrollPos = GUILayout.BeginScrollView(playerActionScrollPos);
 
-            PlayerControl target = lockedPlayersList.FirstOrDefault(p => p.PlayerId == selectedHydraPlayerId);
+            PlayerControl target = lockedPlayersList.FirstOrDefault(p => p.PlayerId == selectedAntiCheatPlayerId);
 
             if (target != null && target.Data != null)
             {
@@ -5163,6 +5166,8 @@ namespace ElysiumModMenu
             endlessVentTime = DrawToggle(endlessVentTime, "Endless Vent Time", 160);
             GUILayout.Space(5);
             noVentCooldown = DrawToggle(noVentCooldown, "No Vent Cooldown", 160);
+            GUILayout.Space(5);
+            noMapCooldowns = DrawToggle(noMapCooldowns, "No Map Cooldowns", 160);
             GUILayout.EndVertical();
 
             GUILayout.Space(5);
@@ -6932,6 +6937,13 @@ namespace ElysiumModMenu
             {
                 if (box == null) return true;
 
+                string compositionString = Input.compositionString;
+                if (!string.IsNullOrEmpty(compositionString))
+                {
+                    result = true;
+                    return false;
+                }
+
                 string input = isPastingChatInput ? GUIUtility.systemCopyBuffer : Input.inputString;
                 if (string.IsNullOrEmpty(input)) return true;
 
@@ -6943,9 +6955,10 @@ namespace ElysiumModMenu
                 char currentChar = text[currentPasteCharPos];
                 currentPasteCharPos = currentPasteCharPos >= text.Length - 1 ? 0 : currentPasteCharPos + 1;
 
-                if (enableClipboard || allowLinksAndSymbols)
+                if (allowLinksAndSymbols)
                 {
-                    result = currentChar != '\b' && currentChar != '\r' && currentChar != '\n';
+                    HashSet<char> blockedSymbols = new HashSet<char> { '\b', '\r', '\n', '>', '<', '[' };
+                    result = !blockedSymbols.Contains(currentChar);
                     return false;
                 }
 
@@ -6959,9 +6972,9 @@ namespace ElysiumModMenu
             public static void Postfix(TextBoxTMP __instance)
             {
                 if (__instance == null) return;
-                __instance.allowAllCharacters = true;
-                __instance.AllowSymbols = true;
-                __instance.AllowEmail = true;
+                __instance.allowAllCharacters = ElysiumModMenuGUI.allowLinksAndSymbols;
+                __instance.AllowSymbols = ElysiumModMenuGUI.allowLinksAndSymbols;
+                __instance.AllowEmail = ElysiumModMenuGUI.allowLinksAndSymbols;
             }
         }
 
@@ -7202,6 +7215,7 @@ namespace ElysiumModMenu
             if (autoChatEveryone)
             {
                 GUILayout.BeginHorizontal();
+                GUILayout.Label($"Delay: {autoChatEveryoneDelay:0.0}s", toggleLabelStyle, GUILayout.Width(95));
                 autoChatEveryoneDelay = GUILayout.HorizontalSlider(autoChatEveryoneDelay, 0f, 10f, sliderStyle, sliderThumbStyle, GUILayout.Width(240));
                 GUILayout.EndHorizontal();
             }
@@ -7757,6 +7771,67 @@ namespace ElysiumModMenu
                     var btn = DestroyableSingleton<HudManager>.Instance?.AbilityButton;
                     if (btn != null) { btn.ResetCoolDown(); btn.SetCooldownFill(0f); }
                 }
+            }
+        }
+
+        private static bool TrySetCooldownMember(object target, float value)
+        {
+            if (target == null) return false;
+
+            string[] names = { "CoolDown", "_CoolDown_k__BackingField", "<CoolDown>k__BackingField", "coolDown", "cooldown" };
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+            try
+            {
+                Type type = target.GetType();
+                foreach (string name in names)
+                {
+                    PropertyInfo property = type.GetProperty(name, flags);
+                    if (property != null && property.CanWrite)
+                    {
+                        property.SetValue(target, value, null);
+                        return true;
+                    }
+
+                    FieldInfo field = type.GetField(name, flags);
+                    if (field != null)
+                    {
+                        field.SetValue(target, value);
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        [HarmonyPatch(typeof(Ladder), "SetDestinationCooldown")]
+        public static class Ladder_SetDestinationCooldown_Patch
+        {
+            public static bool Prefix(Ladder __instance)
+            {
+                try
+                {
+                    if (!ElysiumModMenuGUI.noMapCooldowns) return true;
+                    TrySetCooldownMember(__instance, 0f);
+                    return false;
+                }
+                catch { return true; }
+            }
+        }
+
+        [HarmonyPatch(typeof(ZiplineConsole), "Update")]
+        public static class ZiplineConsole_Update_Patch
+        {
+            public static void Postfix(ZiplineConsole __instance)
+            {
+                try
+                {
+                    if (!ElysiumModMenuGUI.noMapCooldowns) return;
+                    TrySetCooldownMember(__instance, 0f);
+                }
+                catch { }
             }
         }
 
@@ -8448,7 +8523,7 @@ public static class RPCSniffer_Patch
             { 189, ("GMM", "#FF0000") },
             { 169, ("Malum", "#FF0000") },
             { 210, ("Eclipse", "#FFFF00") },
-            { 173, ("Private", "#FF0000") },
+            { 173, ("Private Client", "#FF0000") },
             { 151, ("Better Among Us", "#008000") },
             { 152, ("Better Among Us", "#008000") },
             { 255, ("CrewMod", "#FFFF00") },
