@@ -1065,6 +1065,8 @@ namespace ElysiumModMenu
             GUILayout.Space(5);
             enablePasosLimit = DrawToggle(enablePasosLimit, "Pasos Limit", 250);
             GUILayout.Space(5);
+            enableLocalPasosBan = DrawToggle(enableLocalPasosBan, L("Anti-Pasos Local Ban", "Анти-Pasos локал бан"), 250);
+            GUILayout.Space(5);
             enableHostPasosBan = DrawToggle(enableHostPasosBan, L("Anti-Pasos Host Ban", "Анти-Pasos бан хоста"), 250);
 
             GUILayout.Space(15);
@@ -2472,28 +2474,22 @@ namespace ElysiumModMenu
             private const byte RpcGameDataTag = 2;
             private const byte DroppedGameDataTag = 0;
             private const int PasosDropNotifyLimit = 1;
-            private const float PasosWindow = 0.15f;
+            private const float PasosWindow = 0.01f;
             private const float PasosNotifyCooldown = 2f;
             private static readonly Queue<float> emptyRpcDrops = new Queue<float>();
             private static readonly HashSet<int> pasosBlockedClientIds = new HashSet<int>();
+            private static readonly HashSet<int> pasosHostBannedClientIds = new HashSet<int>();
             private static float lastPasosNotify;
             private static int currentPasosClientId = -1;
 
             public static void BeginMessageContext(int clientId)
             {
-                if (IsValidClientId(clientId))
-                    currentPasosClientId = clientId;
-            }
-
-            public static void SetCurrentClientId(int clientId)
-            {
-                if (IsValidClientId(clientId))
-                    currentPasosClientId = clientId;
+                currentPasosClientId = IsValidClientId(clientId) ? clientId : -1;
             }
 
             public static bool IsClientBlocked(int clientId)
             {
-                return IsValidClientId(clientId) && pasosBlockedClientIds.Contains(clientId);
+                return ElysiumModMenuGUI.enableLocalPasosBan && IsValidClientId(clientId) && pasosBlockedClientIds.Contains(clientId);
             }
 
             public static bool IsValidClientId(int clientId)
@@ -2512,7 +2508,7 @@ namespace ElysiumModMenu
                 int resolvedClientId = IsValidClientId(clientId) ? clientId : currentPasosClientId;
                 if (!IsValidClientId(resolvedClientId))
                     resolvedClientId = ResolveSingleRemoteClientId();
-                if (IsValidClientId(resolvedClientId) && !IsClientBlocked(resolvedClientId))
+                if (IsValidClientId(resolvedClientId))
                     BlockPasosClient(resolvedClientId);
 
                 if (emptyRpcDrops.Count >= PasosDropNotifyLimit && now - lastPasosNotify > PasosNotifyCooldown)
@@ -2528,15 +2524,20 @@ namespace ElysiumModMenu
                 {
                     if (!IsValidClientId(clientId) || (AmongUsClient.Instance != null && clientId == AmongUsClient.Instance.ClientId)) return;
 
-                    pasosBlockedClientIds.Add(clientId);
-
                     PlayerControl player = FindPlayerByClientId(clientId);
                     string pName = player?.Data?.PlayerName ?? $"Client {clientId}";
-                    ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> <b>{pName}</b> Anti-Pasos blocked (Local)!");
+
+                    if (ElysiumModMenuGUI.enableLocalPasosBan && pasosBlockedClientIds.Add(clientId))
+                    {
+                        ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> <b>{pName}</b> Anti-Pasos blocked (Local)!");
+                    }
 
                     if (!ElysiumModMenuGUI.enableHostPasosBan || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                    if (!pasosHostBannedClientIds.Add(clientId)) return;
 
                     int banClientId = GetKickClientId(player, clientId);
+                    if (!IsValidClientId(banClientId)) return;
+
                     string fc = string.IsNullOrEmpty(player?.Data?.FriendCode) ? "Unknown" : player.Data.FriendCode;
                     string puid = banClientId.ToString();
 
@@ -2723,45 +2724,6 @@ namespace ElysiumModMenu
                 return -1;
             }
 
-            public static bool TryDropWholePacketIfPasosSpam(MessageReader parentReader, int clientId = -1, bool skipGameId = false)
-            {
-                if (!ElysiumModMenuGUI.enablePasosLimit || parentReader == null) return false;
-
-                try
-                {
-                    int oldPos = parentReader.Position;
-
-                    if (skipGameId)
-                    {
-                        if (parentReader.BytesRemaining < 4) return false;
-                        parentReader.ReadInt32();
-                    }
-
-                    while (parentReader.BytesRemaining > 0)
-                    {
-                        MessageReader child = parentReader.ReadMessage();
-                        if (child == null) continue;
-
-                        if (child.Tag == RpcGameDataTag && child.Length <= 0 && child.BytesRemaining <= 0)
-                        {
-                            parentReader.Position = parentReader.Length;
-                            RecordDrop(clientId);
-                            return true;
-                        }
-                    }
-
-                    parentReader.Position = oldPos;
-                }
-                catch
-                {
-                    try { parentReader.Position = parentReader.Length; } catch { }
-                    RecordDrop(clientId);
-                    return true;
-                }
-
-                return false;
-            }
-
             public static void Postfix(MessageReader __result)
             {
                 DropEmptyRpcMessage(__result);
@@ -2781,15 +2743,6 @@ namespace ElysiumModMenu
                     RecordDrop();
                 }
                 catch { }
-            }
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadMessageAsNewBuffer))]
-        public static class Shield_PasosLimit_ReadMessageAsNewBuffer_Patch
-        {
-            public static void Postfix(MessageReader __result)
-            {
-                Shield_PasosLimit_Patch.DropEmptyRpcMessage(__result);
             }
         }
 
@@ -2839,302 +2792,6 @@ namespace ElysiumModMenu
             private static int ExtractClientId(object source)
             {
                 return Shield_PasosLimit_Patch.ResolveClientId(source);
-            }
-        }
-
-        [HarmonyPatch]
-        public static class Shield_PasosLimit_HandleGameData_Patch
-        {
-            public static MethodBase TargetMethod()
-            {
-                return AccessTools.Method(typeof(InnerNetClient), "HandleGameData", new[] { typeof(MessageReader) });
-            }
-
-            public static bool Prefix(object[] __args)
-            {
-                if (!ElysiumModMenuGUI.enablePasosLimit) return true;
-
-                try
-                {
-                    int clientId = Shield_PasosLimit_HandleMessageContext_Patch.ExtractClientId(__args);
-                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
-                    if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
-                        return false;
-
-                    MessageReader parentReader = __args != null && __args.Length > 0 ? __args[0] as MessageReader : null;
-                    if (parentReader == null) return true;
-                    if (Shield_PasosLimit_Patch.TryDropWholePacketIfPasosSpam(parentReader, clientId, true))
-                        return false;
-                    if (parentReader.Length > 0 && parentReader.BytesRemaining > 0) return true;
-
-                    Shield_PasosLimit_Patch.RecordDrop(clientId);
-                    return false;
-                }
-                catch { }
-
-                return true;
-            }
-        }
-
-        [HarmonyPatch]
-        public static class Shield_PasosLimit_HandleGameDataInner_Patch
-        {
-            public static MethodBase TargetMethod()
-            {
-                return AccessTools.Method(typeof(InnerNetClient), "HandleGameDataInner", new[] { typeof(MessageReader), typeof(int) });
-            }
-
-            public static bool Prefix(object[] __args, ref Il2CppSystem.Collections.IEnumerator __result)
-            {
-                if (!ElysiumModMenuGUI.enablePasosLimit) return true;
-
-                try
-                {
-                    int clientId = ExtractClientId(__args);
-                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
-                    if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
-                    {
-                        __result = EmptyPasosRoutine().WrapToIl2Cpp();
-                        return false;
-                    }
-
-                    MessageReader parentReader = __args != null && __args.Length > 0 ? __args[0] as MessageReader : null;
-                    if (parentReader == null) return true;
-                    if (Shield_PasosLimit_Patch.TryDropWholePacketIfPasosSpam(parentReader, clientId))
-                    {
-                        __result = EmptyPasosRoutine().WrapToIl2Cpp();
-                        return false;
-                    }
-                    if (parentReader.Length > 0 && parentReader.BytesRemaining > 0) return true;
-
-                    Shield_PasosLimit_Patch.RecordDrop(clientId);
-                    __result = EmptyPasosRoutine().WrapToIl2Cpp();
-                    return false;
-                }
-                catch { }
-
-                return true;
-            }
-
-            public static int ExtractClientId(object[] args)
-            {
-                try
-                {
-                    if (args == null || args.Length < 2 || args[1] == null) return -1;
-                    int clientId = Shield_PasosLimit_Patch.ResolveClientId(args[1]);
-                    if (Shield_PasosLimit_Patch.IsValidClientId(clientId)) return clientId;
-
-                    int fallback = Convert.ToInt32(args[1]);
-                    return Shield_PasosLimit_Patch.IsValidClientId(fallback) ? fallback : -1;
-                }
-                catch { }
-
-                return -1;
-            }
-
-            private static System.Collections.IEnumerator EmptyPasosRoutine() { yield break; }
-        }
-
-        [HarmonyPatch]
-        public static class Shield_PasosLimit_HandleGameDataInner_MoveNext_Patch
-        {
-            public static IEnumerable<MethodBase> TargetMethods()
-            {
-                foreach (Type nestedType in typeof(InnerNetClient).GetNestedTypes(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-                {
-                    if (!nestedType.Name.Contains("HandleGameDataInner")) continue;
-
-                    MethodInfo moveNext = AccessTools.Method(nestedType, "MoveNext");
-                    if (moveNext != null)
-                        yield return moveNext;
-                }
-            }
-
-            public static bool Prefix(object __instance, ref bool __result)
-            {
-                if (!ElysiumModMenuGUI.enablePasosLimit || __instance == null) return true;
-
-                try
-                {
-                    int clientId = ExtractClientId(__instance);
-                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
-                    if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
-                    {
-                        __result = false;
-                        return false;
-                    }
-
-                    if (!HasPasosGameDataReader(__instance, clientId)) return true;
-
-                    __result = false;
-                    return false;
-                }
-                catch { }
-
-                return true;
-            }
-
-            private static bool HasPasosGameDataReader(object routine, int clientId)
-            {
-                FieldInfo[] fields = routine.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                foreach (FieldInfo field in fields)
-                {
-                    if (!typeof(MessageReader).IsAssignableFrom(field.FieldType)) continue;
-
-                    MessageReader reader = field.GetValue(routine) as MessageReader;
-                    if (reader != null && reader.Length <= 0 && reader.BytesRemaining <= 0)
-                    {
-                        Shield_PasosLimit_Patch.RecordDrop(clientId);
-                        return true;
-                    }
-
-                    if (Shield_PasosLimit_Patch.TryDropWholePacketIfPasosSpam(reader, clientId))
-                        return true;
-                }
-
-                return false;
-            }
-
-            private static int ExtractClientId(object routine)
-            {
-                try
-                {
-                    FieldInfo[] fields = routine.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    foreach (FieldInfo field in fields)
-                    {
-                        if (field.FieldType != typeof(int)) continue;
-                        string fieldName = field.Name.ToLowerInvariant();
-                        if (!fieldName.Contains("client") &&
-                            !fieldName.Contains("sender") &&
-                            !fieldName.Contains("source") &&
-                            !fieldName.Contains("player") &&
-                            !fieldName.Contains("id"))
-                            continue;
-
-                        int value = Shield_PasosLimit_Patch.ResolveClientId(field.GetValue(routine));
-                        if (value >= 0) return value;
-                    }
-                }
-                catch { }
-
-                return -1;
-            }
-        }
-
-        public static bool ShouldDropPasosEmptyRead(MessageReader reader)
-        {
-            if (!ElysiumModMenuGUI.enablePasosLimit || reader == null) return false;
-
-            try
-            {
-                if (reader.Length > 0 || reader.BytesRemaining > 0) return false;
-
-                Shield_PasosLimit_Patch.RecordDrop();
-                return true;
-            }
-            catch { }
-
-            return false;
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadPackedInt32))]
-        public static class Shield_PasosLimit_ReadPackedInt32_Patch
-        {
-            public static bool Prefix(MessageReader __instance, ref int __result)
-            {
-                if (!ShouldDropPasosEmptyRead(__instance)) return true;
-
-                __result = 0;
-                return false;
-            }
-
-            public static Exception Finalizer(MessageReader __instance, Exception __exception, ref int __result)
-            {
-                if (__exception == null || !ElysiumModMenuGUI.enablePasosLimit) return __exception;
-
-                try
-                {
-                    if (__instance == null || __instance.Length > 0 || __instance.BytesRemaining > 0) return __exception;
-
-                    Shield_PasosLimit_Patch.RecordDrop();
-                    __result = 0;
-                    return null;
-                }
-                catch { }
-
-                return __exception;
-            }
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadPackedUInt32))]
-        public static class Shield_PasosLimit_ReadPackedUInt32_Patch
-        {
-            public static bool Prefix(MessageReader __instance, ref uint __result)
-            {
-                if (!ShouldDropPasosEmptyRead(__instance)) return true;
-
-                __result = 0u;
-                return false;
-            }
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadUInt32))]
-        public static class Shield_PasosLimit_ReadUInt32_Patch
-        {
-            public static bool Prefix(MessageReader __instance, ref uint __result)
-            {
-                if (!ShouldDropPasosEmptyRead(__instance)) return true;
-
-                __result = 0u;
-                return false;
-            }
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadByte))]
-        public static class Shield_PasosLimit_ReadByte_Patch
-        {
-            public static bool Prefix(MessageReader __instance, ref byte __result)
-            {
-                if (!ShouldDropPasosEmptyRead(__instance)) return true;
-
-                __result = 0;
-                return false;
-            }
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadSByte))]
-        public static class Shield_PasosLimit_ReadSByte_Patch
-        {
-            public static bool Prefix(MessageReader __instance, ref sbyte __result)
-            {
-                if (!ShouldDropPasosEmptyRead(__instance)) return true;
-
-                __result = 0;
-                return false;
-            }
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadBoolean))]
-        public static class Shield_PasosLimit_ReadBoolean_Patch
-        {
-            public static bool Prefix(MessageReader __instance, ref bool __result)
-            {
-                if (!ShouldDropPasosEmptyRead(__instance)) return true;
-
-                __result = false;
-                return false;
-            }
-        }
-
-        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadString))]
-        public static class Shield_PasosLimit_ReadString_Patch
-        {
-            public static bool Prefix(MessageReader __instance, ref string __result)
-            {
-                if (!ShouldDropPasosEmptyRead(__instance)) return true;
-
-                __result = string.Empty;
-                return false;
             }
         }
 
@@ -3611,6 +3268,7 @@ namespace ElysiumModMenu
                 SaveBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 SaveBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
                 SaveBool("M_PasosLimit", enablePasosLimit);
+                SaveBool("M_AntiPasosLocalBan", enableLocalPasosBan);
                 SaveBool("M_AntiPasosHostBan", enableHostPasosBan);
                 SaveBool("M_AutoHostEnabled", AutoHostEnabled);
                 SaveBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
@@ -3770,6 +3428,7 @@ namespace ElysiumModMenu
                 blockChatFloodRpc = LoadBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 blockMeetingFloodRpc = LoadBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
                 enablePasosLimit = LoadBool("M_PasosLimit", enablePasosLimit);
+                enableLocalPasosBan = LoadBool("M_AntiPasosLocalBan", enableLocalPasosBan);
                 enableHostPasosBan = LoadBool("M_AntiPasosHostBan", enableHostPasosBan);
                 AutoHostEnabled = LoadBool("M_AutoHostEnabled", AutoHostEnabled);
                 AutoReturnLobbyAfterMatch = LoadBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
@@ -7473,6 +7132,7 @@ namespace ElysiumModMenu
         public static bool blockChatFloodRpc = true;
         public static bool blockMeetingFloodRpc = true;
         public static bool enablePasosLimit = true;
+        public static bool enableLocalPasosBan = true;
         public static bool enableHostPasosBan = true;
         public static bool autoBanBrokenFriendCode = false;
         public static int chatRpcLimit = 1;
