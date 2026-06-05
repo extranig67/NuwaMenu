@@ -1064,6 +1064,8 @@ namespace ElysiumModMenu
             blockChatFloodRpc = DrawToggle(blockChatFloodRpc, "Block Chat RPC Flood", 250);
             GUILayout.Space(5);
             enablePasosLimit = DrawToggle(enablePasosLimit, "Pasos Limit", 250);
+            GUILayout.Space(5);
+            enableHostPasosBan = DrawToggle(enableHostPasosBan, L("Auto-Ban Pasos Spam", "Авто-бан за Pasos Spam"), 250);
 
             GUILayout.Space(15);
             GUILayout.Label(L("OTHER PROTECTIONS", "ПРОЧАЯ ЗАЩИТА"), headerStyle);
@@ -2469,13 +2471,26 @@ namespace ElysiumModMenu
         {
             private const byte RpcGameDataTag = 2;
             private const byte DroppedGameDataTag = 0;
-            private const int PasosDropNotifyLimit = 40;
+            private const int PasosDropNotifyLimit = 1;
             private const float PasosWindow = 0.75f;
             private const float PasosNotifyCooldown = 2f;
             private static readonly Queue<float> emptyRpcDrops = new Queue<float>();
+            private static readonly HashSet<int> pasosBlockedClientIds = new HashSet<int>();
             private static float lastPasosNotify;
+            private static int currentPasosClientId = -1;
 
-            public static void RecordDrop()
+            public static void SetCurrentClientId(int clientId)
+            {
+                if (clientId >= 0)
+                    currentPasosClientId = clientId;
+            }
+
+            public static bool IsClientBlocked(int clientId)
+            {
+                return clientId >= 0 && pasosBlockedClientIds.Contains(clientId);
+            }
+
+            public static void RecordDrop(int clientId = -1)
             {
                 float now = UnityEngine.Time.time;
                 while (emptyRpcDrops.Count > 0 && emptyRpcDrops.Peek() < now - PasosWindow)
@@ -2483,11 +2498,72 @@ namespace ElysiumModMenu
 
                 emptyRpcDrops.Enqueue(now);
 
-                if (emptyRpcDrops.Count > PasosDropNotifyLimit && now - lastPasosNotify > PasosNotifyCooldown)
+                int resolvedClientId = clientId >= 0 ? clientId : currentPasosClientId;
+                if (resolvedClientId >= 0 && !pasosBlockedClientIds.Contains(resolvedClientId))
+                    BlockPasosClient(resolvedClientId);
+
+                if (emptyRpcDrops.Count >= PasosDropNotifyLimit && now - lastPasosNotify > PasosNotifyCooldown)
                 {
                     lastPasosNotify = now;
                     ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Pasos Limit: dropped empty RPC spam ({emptyRpcDrops.Count}/{PasosWindow:0.00}s)");
                 }
+            }
+
+            private static void BlockPasosClient(int clientId)
+            {
+                try
+                {
+                    if (clientId < 0 || (AmongUsClient.Instance != null && clientId == AmongUsClient.Instance.ClientId)) return;
+
+                    pasosBlockedClientIds.Add(clientId);
+
+                    PlayerControl player = FindPlayerByClientId(clientId);
+                    string pName = player?.Data?.PlayerName ?? $"Client {clientId}";
+                    ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> <b>{pName}</b> blocked by Pasos Limit (Local)!");
+
+                    if (!ElysiumModMenuGUI.enableHostPasosBan || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+
+                    string fc = string.IsNullOrEmpty(player?.Data?.FriendCode) ? "Unknown" : player.Data.FriendCode;
+                    string puid = clientId.ToString();
+
+                    try
+                    {
+                        if (player != null)
+                        {
+                            var client = AmongUsClient.Instance.GetClientFromCharacter(player);
+                            if (client != null) puid = client.Id.ToString();
+                        }
+                    }
+                    catch { }
+
+                    ElysiumModMenuGUI.AddToBanList(fc, puid, pName, "Auto-banned for Pasos empty RPC spam");
+                    AmongUsClient.Instance.KickPlayer(clientId, true);
+                    ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> <b>{pName}</b> auto-banned for Pasos Spam!");
+                }
+                catch { }
+            }
+
+            public static PlayerControl FindPlayerByClientId(int clientId)
+            {
+                try
+                {
+                    if (PlayerControl.AllPlayerControls == null) return null;
+
+                    foreach (PlayerControl pc in PlayerControl.AllPlayerControls)
+                    {
+                        if (pc == null) continue;
+                        if ((int)pc.OwnerId == clientId) return pc;
+
+                        try
+                        {
+                            if (pc.Data != null && pc.Data.ClientId == clientId) return pc;
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+
+                return null;
             }
 
             public static void Postfix(MessageReader __result)
@@ -2518,6 +2594,75 @@ namespace ElysiumModMenu
             public static void Postfix(MessageReader __result)
             {
                 Shield_PasosLimit_Patch.DropEmptyRpcMessage(__result);
+            }
+        }
+
+        [HarmonyPatch]
+        public static class Shield_PasosLimit_HandleMessageContext_Patch
+        {
+            public static IEnumerable<MethodBase> TargetMethods()
+            {
+                foreach (MethodInfo method in typeof(InnerNetClient).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                {
+                    if (method.Name != "HandleMessage") continue;
+                    if (method.GetParameters().Any(p => p.ParameterType == typeof(MessageReader)))
+                        yield return method;
+                }
+            }
+
+            public static bool Prefix(object[] __args)
+            {
+                if (!ElysiumModMenuGUI.enablePasosLimit) return true;
+
+                try
+                {
+                    int clientId = ExtractClientId(__args);
+                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
+
+                    if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
+                        return false;
+                }
+                catch { }
+
+                return true;
+            }
+
+            private static int ExtractClientId(object[] args)
+            {
+                if (args == null) return -1;
+
+                foreach (object arg in args)
+                {
+                    int clientId = ExtractClientId(arg);
+                    if (clientId >= 0) return clientId;
+                }
+
+                return -1;
+            }
+
+            private static int ExtractClientId(object source)
+            {
+                if (source == null || source is MessageReader || source is SendOption) return -1;
+
+                try
+                {
+                    if (source is int directId) return directId;
+
+                    Type type = source.GetType();
+                    foreach (string name in new[] { "ClientId", "Id", "clientId", "id" })
+                    {
+                        PropertyInfo property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (property != null && property.PropertyType == typeof(int))
+                            return (int)property.GetValue(source);
+
+                        FieldInfo field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null && field.FieldType == typeof(int))
+                            return (int)field.GetValue(source);
+                    }
+                }
+                catch { }
+
+                return -1;
             }
         }
 
@@ -2562,17 +2707,37 @@ namespace ElysiumModMenu
 
                 try
                 {
+                    int clientId = ExtractClientId(__args);
+                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
+                    if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
+                    {
+                        __result = EmptyPasosRoutine().WrapToIl2Cpp();
+                        return false;
+                    }
+
                     MessageReader parentReader = __args != null && __args.Length > 0 ? __args[0] as MessageReader : null;
                     if (parentReader == null) return true;
                     if (parentReader.Length > 0 && parentReader.BytesRemaining > 0) return true;
 
-                    Shield_PasosLimit_Patch.RecordDrop();
+                    Shield_PasosLimit_Patch.RecordDrop(clientId);
                     __result = EmptyPasosRoutine().WrapToIl2Cpp();
                     return false;
                 }
                 catch { }
 
                 return true;
+            }
+
+            private static int ExtractClientId(object[] args)
+            {
+                try
+                {
+                    if (args == null || args.Length < 2 || args[1] == null) return -1;
+                    return Convert.ToInt32(args[1]);
+                }
+                catch { }
+
+                return -1;
             }
 
             private static System.Collections.IEnumerator EmptyPasosRoutine() { yield break; }
@@ -2599,9 +2764,17 @@ namespace ElysiumModMenu
 
                 try
                 {
+                    int clientId = ExtractClientId(__instance);
+                    Shield_PasosLimit_Patch.SetCurrentClientId(clientId);
+                    if (Shield_PasosLimit_Patch.IsClientBlocked(clientId))
+                    {
+                        __result = false;
+                        return false;
+                    }
+
                     if (!HasEmptyGameDataReader(__instance)) return true;
 
-                    Shield_PasosLimit_Patch.RecordDrop();
+                    Shield_PasosLimit_Patch.RecordDrop(clientId);
                     __result = false;
                     return false;
                 }
@@ -2623,6 +2796,25 @@ namespace ElysiumModMenu
                 }
 
                 return false;
+            }
+
+            private static int ExtractClientId(object routine)
+            {
+                try
+                {
+                    FieldInfo[] fields = routine.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    foreach (FieldInfo field in fields)
+                    {
+                        if (field.FieldType != typeof(int)) continue;
+
+                        int value = (int)field.GetValue(routine);
+                        if (value >= 0 && value < 256)
+                            return value;
+                    }
+                }
+                catch { }
+
+                return -1;
             }
         }
 
@@ -3216,6 +3408,7 @@ namespace ElysiumModMenu
                 SaveBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 SaveBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
                 SaveBool("M_PasosLimit", enablePasosLimit);
+                SaveBool("M_HostPasosBan", enableHostPasosBan);
                 SaveBool("M_AutoHostEnabled", AutoHostEnabled);
                 SaveBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
                 SaveBool("M_AutoHostNotifications", AutoHostNotifications);
@@ -3374,6 +3567,7 @@ namespace ElysiumModMenu
                 blockChatFloodRpc = LoadBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 blockMeetingFloodRpc = LoadBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
                 enablePasosLimit = LoadBool("M_PasosLimit", enablePasosLimit);
+                enableHostPasosBan = LoadBool("M_HostPasosBan", enableHostPasosBan);
                 AutoHostEnabled = LoadBool("M_AutoHostEnabled", AutoHostEnabled);
                 AutoReturnLobbyAfterMatch = LoadBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
                 AutoHostNotifications = LoadBool("M_AutoHostNotifications", AutoHostNotifications);
@@ -7076,6 +7270,7 @@ namespace ElysiumModMenu
         public static bool blockChatFloodRpc = true;
         public static bool blockMeetingFloodRpc = true;
         public static bool enablePasosLimit = true;
+        public static bool enableHostPasosBan = false;
         public static bool autoBanBrokenFriendCode = false;
         public static int chatRpcLimit = 1;
         public static float chatRpcWindow = 1f;
