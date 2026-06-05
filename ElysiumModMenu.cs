@@ -1062,6 +1062,8 @@ namespace ElysiumModMenu
             blockMeetingFloodRpc = DrawToggle(blockMeetingFloodRpc, "Block Meeting RPC Flood", 250);
             GUILayout.Space(5);
             blockChatFloodRpc = DrawToggle(blockChatFloodRpc, "Block Chat RPC Flood", 250);
+            GUILayout.Space(5);
+            enablePasosLimit = DrawToggle(enablePasosLimit, "Pasos Limit", 250);
 
             GUILayout.Space(15);
             GUILayout.Label(L("OTHER PROTECTIONS", "ПРОЧАЯ ЗАЩИТА"), headerStyle);
@@ -2461,6 +2463,45 @@ namespace ElysiumModMenu
 
         public static bool enableLocalPetSpamDrop = true;
         public static bool enableHostPetSpamBan = false;
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadMessage))]
+        public static class Shield_PasosLimit_Patch
+        {
+            private const byte RpcGameDataTag = 2;
+            private const byte DroppedGameDataTag = 0;
+            private const int PasosDropNotifyLimit = 40;
+            private const float PasosWindow = 0.75f;
+            private const float PasosNotifyCooldown = 2f;
+            private static readonly Queue<float> emptyRpcDrops = new Queue<float>();
+            private static float lastPasosNotify;
+
+            public static void Postfix(MessageReader __result)
+            {
+                if (!ElysiumModMenuGUI.enablePasosLimit || __result == null) return;
+
+                try
+                {
+                    if (__result.Tag != RpcGameDataTag || __result.BytesRemaining > 0) return;
+
+                    __result.Tag = DroppedGameDataTag;
+                    __result.Position = __result.Length;
+
+                    float now = UnityEngine.Time.time;
+                    while (emptyRpcDrops.Count > 0 && emptyRpcDrops.Peek() < now - PasosWindow)
+                        emptyRpcDrops.Dequeue();
+
+                    emptyRpcDrops.Enqueue(now);
+
+                    if (emptyRpcDrops.Count > PasosDropNotifyLimit && now - lastPasosNotify > PasosNotifyCooldown)
+                    {
+                        lastPasosNotify = now;
+                        ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[SHIELD]</color> Pasos Limit: dropped empty RPC spam ({emptyRpcDrops.Count}/{PasosWindow:0.00}s)");
+                    }
+                }
+                catch { }
+            }
+        }
+
         [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.HandleRpc))]
         public static class Shield_PetSpam_Patch
         {
@@ -2933,6 +2974,7 @@ namespace ElysiumModMenu
                 SaveBool("M_BlockGameRpcInLobby", blockGameRpcInLobby);
                 SaveBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 SaveBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
+                SaveBool("M_PasosLimit", enablePasosLimit);
                 SaveBool("M_AutoHostEnabled", AutoHostEnabled);
                 SaveBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
                 SaveBool("M_AutoHostNotifications", AutoHostNotifications);
@@ -3090,6 +3132,7 @@ namespace ElysiumModMenu
                 blockGameRpcInLobby = LoadBool("M_BlockGameRpcInLobby", blockGameRpcInLobby);
                 blockChatFloodRpc = LoadBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 blockMeetingFloodRpc = LoadBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
+                enablePasosLimit = LoadBool("M_PasosLimit", enablePasosLimit);
                 AutoHostEnabled = LoadBool("M_AutoHostEnabled", AutoHostEnabled);
                 AutoReturnLobbyAfterMatch = LoadBool("M_AutoReturnLobbyAfterMatch", AutoReturnLobbyAfterMatch);
                 AutoHostNotifications = LoadBool("M_AutoHostNotifications", AutoHostNotifications);
@@ -6791,6 +6834,7 @@ namespace ElysiumModMenu
         public static bool blockGameRpcInLobby = true;
         public static bool blockChatFloodRpc = true;
         public static bool blockMeetingFloodRpc = true;
+        public static bool enablePasosLimit = true;
         public static bool autoBanBrokenFriendCode = false;
         public static int chatRpcLimit = 1;
         public static float chatRpcWindow = 1f;
