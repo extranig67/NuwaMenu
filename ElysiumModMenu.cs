@@ -35,7 +35,7 @@ using Vector3 = UnityEngine.Vector3;
 using System.Runtime.CompilerServices;
 namespace ElysiumModMenu
 {
-    [BepInPlugin("com.elysiummodmenu.menu", "ElysiumModMenu", "1.3.1")]
+    [BepInPlugin("com.elysiummodmenu.menu", "ElysiumModMenu", "1.3.2")]
     public class Plugin : BasePlugin
     {
         public static Plugin Instance { get; private set; } = null!;
@@ -2873,8 +2873,9 @@ namespace ElysiumModMenu
                 Plugin.RpcSpoofDelayConfig.Value = rpcSpoofDelay;
                 Plugin.MenuColorIndexConfig.Value = currentMenuColorIndex;
                 Plugin.RgbMenuModeConfig.Value = rgbMenuMode;
-                Plugin.MenuKeybind.Value = KeyCode.Insert;
-                menuToggleKey = KeyCode.Insert;
+                if (menuToggleKey == KeyCode.None) menuToggleKey = KeyCode.Insert;
+                Plugin.MenuKeybind.Value = menuToggleKey;
+                PlayerPrefs.SetInt("M_MenuToggleKey", (int)menuToggleKey);
                 SaveBool("M_WhiteTheme", whiteMenuTheme);
                 PlayerPrefs.SetInt("M_BndMMorph", (int)bindMassMorph);
                 PlayerPrefs.SetInt("M_BndSpawn", (int)bindSpawnLobby);
@@ -3031,7 +3032,9 @@ namespace ElysiumModMenu
                 enableLocalFriendCodeSpoof = LoadBool("M_LocalFakeFCEnabled", enableLocalFriendCodeSpoof);
                 if (PlayerPrefs.HasKey("M_LocalFakeFC")) localFriendCodeInput = PlayerPrefs.GetString("M_LocalFakeFC");
                 if (PlayerPrefs.HasKey("M_BndMagnet")) bindMagnetCursor = (KeyCode)PlayerPrefs.GetInt("M_BndMagnet");
-                menuToggleKey = KeyCode.Insert;
+                menuToggleKey = Plugin.MenuKeybind.Value == KeyCode.None ? KeyCode.Insert : Plugin.MenuKeybind.Value;
+                if (PlayerPrefs.HasKey("M_MenuToggleKey")) menuToggleKey = (KeyCode)PlayerPrefs.GetInt("M_MenuToggleKey");
+                if (menuToggleKey == KeyCode.None) menuToggleKey = KeyCode.Insert;
                 if (PlayerPrefs.HasKey("M_BndMMorph")) bindMassMorph = (KeyCode)PlayerPrefs.GetInt("M_BndMMorph");
                 if (PlayerPrefs.HasKey("M_BndSpawn")) bindSpawnLobby = (KeyCode)PlayerPrefs.GetInt("M_BndSpawn");
                 if (PlayerPrefs.HasKey("M_BndDespawn")) bindDespawnLobby = (KeyCode)PlayerPrefs.GetInt("M_BndDespawn");
@@ -3100,7 +3103,7 @@ namespace ElysiumModMenu
                 if (PlayerPrefs.HasKey("M_AutoHostFastStartDelaySeconds")) AutoHostFastStartDelaySeconds = PlayerPrefs.GetFloat("M_AutoHostFastStartDelaySeconds");
                 if (PlayerPrefs.HasKey("M_WalkSpeed")) walkSpeed = PlayerPrefs.GetFloat("M_WalkSpeed");
                 if (PlayerPrefs.HasKey("M_EngineSpeed")) engineSpeed = PlayerPrefs.GetFloat("M_EngineSpeed");
-                keyBinds["Toggle Menu"] = KeyCode.Insert;
+                keyBinds["Toggle Menu"] = menuToggleKey;
                 if (PlayerPrefs.HasKey("M_SpoofName")) customNameInput = PlayerPrefs.GetString("M_SpoofName");
             }
             catch { }
@@ -3524,9 +3527,10 @@ namespace ElysiumModMenu
             try
             {
                 GUILayout.Label("CUSTOM KEYBINDS", headerStyle);
-                GUILayout.Label(L("Menu toggle is locked to Insert.", "Меню открывается только на Insert."), safeLineStyle);
+                GUILayout.Label(L("Menu toggle is configurable. Right Shift stays disabled.", "Кнопку меню можно менять. Right Shift выключен."), safeLineStyle);
                 GUILayout.Space(10);
 
+                DrawKeybindRow("Menu Toggle:", ref menuToggleKey, ref isWaitingForBind);
                 DrawKeybindRow("Magnet Cursor:", ref bindMagnetCursor, ref isWaitBindMagnetCursor);
                 DrawKeybindRow("Mass Morph:", ref bindMassMorph, ref isWaitBindMassMorph);
                 DrawKeybindRow("Spawn Lobby:", ref bindSpawnLobby, ref isWaitBindSpawnLobby);
@@ -3683,7 +3687,7 @@ namespace ElysiumModMenu
             string contributorHex = ColorUtility.ToHtmlStringRGB(whiteMenuTheme ? GetThemeAccentColor(new Color32(109, 138, 255, 255)) : new Color32(109, 138, 255, 255));
             string dangerHex = ColorUtility.ToHtmlStringRGB(whiteMenuTheme ? GetThemeAccentColor(new Color32(231, 76, 60, 255)) : new Color32(231, 76, 60, 255));
             string safeHex = ColorUtility.ToHtmlStringRGB(whiteMenuTheme ? GetThemeAccentColor(new Color32(57, 255, 20, 255)) : new Color32(57, 255, 20, 255));
-            string versionText = "1.3.1";
+            string versionText = "1.3.2";
 
             GUIStyle textStyle = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 12 };
             textStyle.normal.textColor = whiteMenuTheme ? new Color(0.16f, 0.16f, 0.16f, 1f) : new Color(0.85f, 0.85f, 0.85f, 1f);
@@ -3721,7 +3725,8 @@ namespace ElysiumModMenu
                 GUILayout.Label($"<b><color=#{safeHex}>{L("Make sure you are using the latest version from GitHub releases.", "Убедитесь, что используете последнюю версию из GitHub releases.")}</color></b>", textStyle);
                 GUILayout.Space(8);
                 GUILayout.Label($"<b><color=#{accentHex}>{L("Quick Hotkeys", "Быстрые клавиши")}</color></b>", textStyle);
-                GUILayout.Label(L("Insert: open or close menu", "Insert: открыть или закрыть меню"), textStyle);
+                string menuKeyText = (menuToggleKey == KeyCode.None ? KeyCode.Insert : menuToggleKey).ToString();
+                GUILayout.Label($"{L("Menu key", "Кнопка меню")}: <b>{menuKeyText}</b>", textStyle);
                 GUILayout.Label(L("Right Click: teleport to cursor", "ПКМ: телепорт к курсору"), textStyle);
                 GUILayout.Label(L("F9: magnet cursor", "F9: магнит курсора"), textStyle);
                 GUILayout.EndVertical();
@@ -5875,7 +5880,8 @@ namespace ElysiumModMenu
                                      isWaitBindEndCrew || isWaitBindEndImp || isWaitBindEndImpDC || isWaitBindEndHnsDC ||
                                      isWaitBindMagnetCursor;
 
-            if (!isTypingOrBinding && Input.GetKeyDown(KeyCode.Insert))
+            KeyCode activeMenuKey = menuToggleKey == KeyCode.None ? KeyCode.Insert : menuToggleKey;
+            if (!isTypingOrBinding && Input.GetKeyDown(activeMenuKey))
             {
                 showMenu = !showMenu;
                 if (!showMenu) SaveConfig();
@@ -7409,7 +7415,7 @@ namespace ElysiumModMenu
 
                     if (ElysiumModMenuGUI.showWatermark)
                     {
-                        string shimmerTitle = ElysiumModMenuGUI.ApplyMenuShimmer("ElysiumModMenu v1.3.1");
+                        string shimmerTitle = ElysiumModMenuGUI.ApplyMenuShimmer("ElysiumModMenu v1.3.2");
                         finalString = $"{shimmerTitle} • " + finalString;
                     }
 
