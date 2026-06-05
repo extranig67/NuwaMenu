@@ -2612,6 +2612,106 @@ namespace ElysiumModMenu
             }
         }
 
+        public static bool ShouldDropPasosEmptyRead(MessageReader reader)
+        {
+            if (!ElysiumModMenuGUI.enablePasosLimit || reader == null) return false;
+
+            try
+            {
+                if (reader.Length > 0 || reader.BytesRemaining > 0) return false;
+
+                Shield_PasosLimit_Patch.RecordDrop();
+                return true;
+            }
+            catch { }
+
+            return false;
+        }
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadPackedInt32))]
+        public static class Shield_PasosLimit_ReadPackedInt32_Patch
+        {
+            public static bool Prefix(MessageReader __instance, ref int __result)
+            {
+                if (!ShouldDropPasosEmptyRead(__instance)) return true;
+
+                __result = 0;
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadPackedUInt32))]
+        public static class Shield_PasosLimit_ReadPackedUInt32_Patch
+        {
+            public static bool Prefix(MessageReader __instance, ref uint __result)
+            {
+                if (!ShouldDropPasosEmptyRead(__instance)) return true;
+
+                __result = 0u;
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadUInt32))]
+        public static class Shield_PasosLimit_ReadUInt32_Patch
+        {
+            public static bool Prefix(MessageReader __instance, ref uint __result)
+            {
+                if (!ShouldDropPasosEmptyRead(__instance)) return true;
+
+                __result = 0u;
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadByte))]
+        public static class Shield_PasosLimit_ReadByte_Patch
+        {
+            public static bool Prefix(MessageReader __instance, ref byte __result)
+            {
+                if (!ShouldDropPasosEmptyRead(__instance)) return true;
+
+                __result = 0;
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadSByte))]
+        public static class Shield_PasosLimit_ReadSByte_Patch
+        {
+            public static bool Prefix(MessageReader __instance, ref sbyte __result)
+            {
+                if (!ShouldDropPasosEmptyRead(__instance)) return true;
+
+                __result = 0;
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadBoolean))]
+        public static class Shield_PasosLimit_ReadBoolean_Patch
+        {
+            public static bool Prefix(MessageReader __instance, ref bool __result)
+            {
+                if (!ShouldDropPasosEmptyRead(__instance)) return true;
+
+                __result = false;
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(MessageReader), nameof(MessageReader.ReadString))]
+        public static class Shield_PasosLimit_ReadString_Patch
+        {
+            public static bool Prefix(MessageReader __instance, ref string __result)
+            {
+                if (!ShouldDropPasosEmptyRead(__instance)) return true;
+
+                __result = string.Empty;
+                return false;
+            }
+        }
+
         [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.HandleRpc))]
         public static class Shield_PetSpam_Patch
         {
