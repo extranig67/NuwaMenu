@@ -1,11 +1,11 @@
 # ✦ ElysiumModMenu — Among Us
 
-♡ **ElysiumModMenu** is a BepInEx IL2CPP mod menu for **Among Us**.
+♡ **ElysiumModMenu** is a BepInEx IL2CPP mod menu for **Among Us**.  
 It combines private lobby tools, visual options, chat improvements, cosmetics, host controls, and menu customization in one place.
 
-> ⚠️ **Warning**
-> This menu includes powerful host-side and network-related features.
-> Use it only in private lobbies, test rooms, or with friends who agreed to play with mods.
+> [!WARNING]
+> This menu includes powerful host-side and network-related features.  
+> Use it only in private lobbies, test rooms, or with friends who agreed to play with mods.  
 > Do not use it to ruin public games, crash lobbies, harass players, or abuse random users.
 
 ---
@@ -136,7 +136,8 @@ The **Host Only** section contains tools for private lobby control.
 * Role manager and force roles
 * Smart end game and lobby automation
 
-> ⚠️ Host tools should only be used in private lobbies with consent from other players.
+> [!WARNING]
+> Host tools should only be used in private lobbies with consent from other players.
 
 ---
 
@@ -218,6 +219,10 @@ Among Us/BepInEx/config/ElysiumModMenu/MenuBG.png
 
 ## 𖤐 Installation
 
+> [!WARNING]
+> Before installing ElysiumModMenu, make sure **BepInEx IL2CPP** is installed correctly.  
+> Use the version that matches your Among Us build and game architecture.
+
 You need **BepInEx IL2CPP** first.
 
 1. Download BepInEx IL2CPP.
@@ -236,16 +241,16 @@ Among Us/BepInEx/plugins/
 
 ## ♡ Finding Your Among Us Folder
 
-**Steam:**
+**Steam:**  
 Library → Among Us → Manage → Browse local files
 
-**Epic Games:**
+**Epic Games:**  
 Library → Among Us → Manage → Open install folder
 
-**Xbox App:**
+**Xbox App:**  
 Manage → Files → Browse
 
-**Itch.io:**
+**Itch.io:**  
 Manage → Open folder in Explorer
 
 ---
@@ -278,8 +283,8 @@ bin/Debug/net6.0/ElysiumModMenu.dll
 
 ## ♡ Disclaimer
 
-ElysiumModMenu is not affiliated with Innersloth and is not officially supported by Among Us.
-
-Use it at your own risk.
-Do not crash public lobbies, grief random players, abuse people, or ruin games for others.
-Support will not be provided for abusive use.
+> [!CAUTION]
+> ElysiumModMenu is not affiliated with Innersloth and is not officially supported by Among Us.  
+> Use it at your own risk.  
+> Do not crash public lobbies, grief random players, abuse people, or ruin games for others.  
+> Support will not be provided for abusive use.
