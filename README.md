@@ -273,11 +273,14 @@ bin/Debug/net6.0/ElysiumModMenu.dll
 
 ## 𖤐 Screenshots
 
-![Anti-cheat and protections](https://github.com/user-attachments/assets/c4a2a364-bd2f-44e4-a27c-8d299ddd8415)
+![Anti-cheat and protections](<img width="1919" height="1079" alt="Снимок экрана 2026-06-14 045615" src="https://github.com/user-attachments/assets/56c3e0e4-98cb-45b0-a46b-7cb36a4af7e3" />
+)
 
-![Host and lobby controls](https://github.com/user-attachments/assets/8373b7c4-a0d2-4762-bf02-38263ad04636)
+![Host and lobby controls](<img width="1919" height="1079" alt="Снимок экрана 2026-06-14 045518" src="https://github.com/user-attachments/assets/083ae8a3-f66c-417d-84f4-55e2feb9dcbb" />
+)
 
-![Visuals and ESP](https://github.com/user-attachments/assets/69735f5d-31db-462e-abdb-de2dcce11f6a)
+![Visuals and ESP](<img width="1919" height="1079" alt="Снимок экрана 2026-06-14 045423" src="https://github.com/user-attachments/assets/bc7321ed-2099-4ecc-b51a-03565f407ba1" />
+)
 
 ---
 
