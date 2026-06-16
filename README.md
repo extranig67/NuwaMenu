@@ -14,7 +14,7 @@ It combines private lobby tools, visual options, chat improvements, cosmetics, h
 
 **Current version:** `v1.3.5.1`
 
-♡ Download: https://github.com/meowchelo/ElysiumModMenu/releases/tag/v1.3.5
+♡ Download: https://github.com/meowchelo/ElysiumModMenu/releases/tag/v1.3.5.1
 
 ---
 
