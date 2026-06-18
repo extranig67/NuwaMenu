@@ -8,6 +8,11 @@ It combines private lobby tools, visual options, chat improvements, cosmetics, h
 > Use it only in private lobbies, test rooms, or with friends who agreed to play with mods.  
 > Do not use it to ruin public games, crash lobbies, harass players, or abuse random users.
 
+## ♡ Discord Community
+
+Join the **ElysiumModMenu** Discord server to stay updated, get support, report issues, and connect with other users.
+
+𖤐 **Invite link:** https://discord.gg/ZP8MgMcB8C
 
 ---
 
