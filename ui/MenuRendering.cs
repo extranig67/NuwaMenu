@@ -632,6 +632,140 @@ private static void DisableRoleBuffImmortality()
 
 private void SabotageMushroom() { if (ShipStatus.Instance == null) return; try { ShipStatus.Instance.RpcUpdateSystem(SystemTypes.MushroomMixupSabotage, (byte)1); } catch { } }
 
+private static void ClearAutoTwoImpostorSelection()
+        {
+            try
+            {
+                foreach (byte playerId in autoTwoImpostorPlayerIds.ToArray())
+                    forcedImpostors.Remove(playerId);
+                autoTwoImpostorPlayerIds.Clear();
+            }
+            catch { }
+        }
+
+private static int GetAutoTwoImpostorLobbyFingerprint(List<PlayerControl> activePlayers)
+        {
+            if (activePlayers == null || activePlayers.Count == 0) return 0;
+
+            int hash = 17;
+            foreach (byte playerId in activePlayers.Select(p => p.PlayerId).OrderBy(id => id))
+                hash = unchecked(hash * 31 + playerId);
+            return unchecked(hash * 31 + activePlayers.Count);
+        }
+
+private static List<PlayerControl> GetAutoTwoImpostorCandidates()
+        {
+            try
+            {
+                if (PlayerControl.AllPlayerControls == null) return new List<PlayerControl>();
+                return PlayerControl.AllPlayerControls.ToArray()
+                    .Where(p => p != null && p.Data != null && !p.Data.Disconnected && p.PlayerId < 100)
+                    .ToList();
+            }
+            catch
+            {
+                return new List<PlayerControl>();
+            }
+        }
+
+private static bool RollAutoTwoImpostors(bool forceNewRoll)
+        {
+            try
+            {
+                List<PlayerControl> activePlayers = GetAutoTwoImpostorCandidates();
+                int fingerprint = GetAutoTwoImpostorLobbyFingerprint(activePlayers);
+                if (!forceNewRoll &&
+                    !autoTwoImpostorsNeedsGameStartRoll &&
+                    autoTwoImpostorPlayerIds.Count == 2 &&
+                    autoTwoImpostorsLastLobbyFingerprint == fingerprint)
+                    return true;
+
+                forcedPreGameRoles.Clear();
+                forcedImpostors.Clear();
+                autoTwoImpostorPlayerIds.Clear();
+                autoTwoImpostorsLastLobbyFingerprint = fingerprint;
+
+                if (activePlayers.Count < 2)
+                {
+                    enablePreGameRoleForce = false;
+                    return false;
+                }
+
+                for (int i = activePlayers.Count - 1; i > 0; i--)
+                {
+                    int swapIndex = UnityEngine.Random.Range(0, i + 1);
+                    PlayerControl temp = activePlayers[i];
+                    activePlayers[i] = activePlayers[swapIndex];
+                    activePlayers[swapIndex] = temp;
+                }
+
+                for (int i = 0; i < 2; i++)
+                {
+                    byte playerId = activePlayers[i].PlayerId;
+                    forcedImpostors.Add(playerId);
+                    autoTwoImpostorPlayerIds.Add(playerId);
+                }
+
+                enablePreGameRoleForce = true;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+private static void TickAutoTwoImpostors()
+        {
+            try
+            {
+                if (!autoTwoImpostors)
+                {
+                    autoTwoImpostorsNeedsGameStartRoll = true;
+                    autoTwoImpostorsWasGameStarted = false;
+                    autoTwoImpostorsLastLobbyFingerprint = 0;
+                    return;
+                }
+
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
+                    return;
+
+                bool isGameStarted = AmongUsClient.Instance.IsGameStarted;
+                if (isGameStarted)
+                {
+                    autoTwoImpostorsWasGameStarted = true;
+                    return;
+                }
+
+                if (autoTwoImpostorsWasGameStarted)
+                {
+                    autoTwoImpostorsWasGameStarted = false;
+                    autoTwoImpostorsNeedsGameStartRoll = true;
+                    autoTwoImpostorsLastLobbyFingerprint = 0;
+                    ClearAutoTwoImpostorSelection();
+                }
+
+                if (Time.unscaledTime < nextAutoTwoImpostorsLobbyCheckAt)
+                    return;
+
+                nextAutoTwoImpostorsLobbyCheckAt = Time.unscaledTime + 0.5f;
+                List<PlayerControl> activePlayers = GetAutoTwoImpostorCandidates();
+                int fingerprint = GetAutoTwoImpostorLobbyFingerprint(activePlayers);
+                if (autoTwoImpostorPlayerIds.Count != 2 || autoTwoImpostorsLastLobbyFingerprint != fingerprint)
+                    RollAutoTwoImpostors(true);
+            }
+            catch { }
+        }
+
+private static void EnsureAutoTwoImpostorsForRoleSelection()
+        {
+            if (!autoTwoImpostors) return;
+            if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+
+            if (RollAutoTwoImpostors(true))
+                autoTwoImpostorsNeedsGameStartRoll = false;
+        }
+
 private void DrawPlayersRoles()
         {
             GUILayout.BeginVertical(menuCardStyle);
@@ -640,16 +774,26 @@ private void DrawPlayersRoles()
             if (GUILayout.Button(enablePreGameRoleForce ? "Role Forcing: ON" : "Role Forcing: OFF", enablePreGameRoleForce ? activeTabStyle : btnStyle, GUILayout.Height(25))) enablePreGameRoleForce = !enablePreGameRoleForce;
             if (GUILayout.Button("Random 2 Imps", btnStyle, GUILayout.Width(110), GUILayout.Height(25)))
             {
-                forcedPreGameRoles.Clear(); forcedImpostors.Clear();
-                var activePlayers = PlayerControl.AllPlayerControls.ToArray().Where(p => p != null && !p.Data.Disconnected).ToList();
-                if (activePlayers.Count >= 2)
+                autoTwoImpostorPlayerIds.Clear();
+                autoTwoImpostorsLastLobbyFingerprint = 0;
+                RollAutoTwoImpostors(true);
+            }
+            if (GUILayout.Button(autoTwoImpostors ? "Auto 2 Imps: ON" : "Auto 2 Imps", autoTwoImpostors ? activeTabStyle : btnStyle, GUILayout.Width(120), GUILayout.Height(25)))
+            {
+                autoTwoImpostors = !autoTwoImpostors;
+                if (autoTwoImpostors)
                 {
-                    for (int i = activePlayers.Count - 1; i > 0; i--) { int swapIndex = UnityEngine.Random.Range(0, i + 1); var temp = activePlayers[i]; activePlayers[i] = activePlayers[swapIndex]; activePlayers[swapIndex] = temp; }
-                    forcedImpostors.Add(activePlayers[0].PlayerId); forcedImpostors.Add(activePlayers[1].PlayerId);
-                    enablePreGameRoleForce = true;
+                    autoTwoImpostorsNeedsGameStartRoll = true;
+                    autoTwoImpostorsLastLobbyFingerprint = 0;
+                    RollAutoTwoImpostors(true);
+                }
+                else
+                {
+                    ClearAutoTwoImpostorSelection();
+                    autoTwoImpostorsLastLobbyFingerprint = 0;
                 }
             }
-            if (GUILayout.Button("Clear All Roles", btnStyle, GUILayout.Width(110), GUILayout.Height(25))) { forcedPreGameRoles.Clear(); forcedImpostors.Clear(); }
+            if (GUILayout.Button("Clear All Roles", btnStyle, GUILayout.Width(110), GUILayout.Height(25))) { autoTwoImpostors = false; autoTwoImpostorPlayerIds.Clear(); autoTwoImpostorsLastLobbyFingerprint = 0; forcedPreGameRoles.Clear(); forcedImpostors.Clear(); }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
@@ -842,7 +986,7 @@ private void DrawMenuTab()
             bool prevHardMenu = hardMenu;
             hardMenu = DrawToggle(hardMenu, L("Solid Menu (block game clicks)", "Твердое меню (блок кликов по игре)"), 260);
             if (prevHardMenu != hardMenu) menuPrefsChanged = true;
-            GUILayout.Label(L("When on, clicks over the menu stay in the menu so you can't misclick the game behind it.", "Когда включено, клики по меню остаются в меню — вы не промахнёте��ь по игре за ним."), menuDescStyle);
+            GUILayout.Label(L("When on, clicks over the menu stay in the menu so you can't misclick the game behind it.", "Когда включено, клики по меню остаются в меню — вы не промахнётесь по игре за ним."), menuDescStyle);
             GUILayout.Space(8);
 
             bool prevAutoCopyCode = autoCopyCodeAndLeave;
@@ -1065,6 +1209,8 @@ private void ResetSlidersToDefault()
             AnimCamsInUseEnabled = false;
             AnimEmptyGarbageEnabled = false;
             skipShhhAnim = false;
+            skipRoleIntroAnim = false;
+            skipKillAnimation = false;
             localRainbow = false;
             localRainbowFreeOnly = false;
             RevealVotesEnabled = false;
@@ -1092,10 +1238,12 @@ private void ResetSlidersToDefault()
             autoKickLowLevelEnabled = false;
             autoKickBugs = false;
             disableVoteKicks = false;
+            banVoteKickVoters = false;
             blockSabotageRPC = true;
             blockGameRpcInLobby = true;
             blockChatFloodRpc = true;
             blockMeetingFloodRpc = true;
+            overflowProtection = true;
             enablePasosLimit = true;
             enableLocalPasosBan = true;
             enableHostPasosBan = true;

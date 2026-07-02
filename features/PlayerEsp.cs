@@ -48,6 +48,7 @@ namespace ElysiumModMenu
         {
             public static bool Prefix(RoleManager __instance)
             {
+                ElysiumModMenuGUI.EnsureAutoTwoImpostorsForRoleSelection();
                 if (!ElysiumModMenuGUI.enablePreGameRoleForce || !AmongUsClient.Instance.AmHost) return true;
                 try
                 {
@@ -65,10 +66,10 @@ namespace ElysiumModMenu
                         var seeker = allPlayers.FirstOrDefault(p => p.PlayerId == seekerId);
                         if (seeker != null)
                         {
-                            impostors.Clear();
-                            impostors.Add(seeker);
-                            numImps = 1;
-                            ElysiumModMenuGUI.SetHideAndSeekSeekerOption(seekerId);
+                            if (!impostors.Contains(seeker))
+                                impostors.Insert(0, seeker);
+                            numImps = impostors.Count > 0 ? impostors.Count : 1;
+                            ElysiumModMenuGUI.SetHideAndSeekSeekerOption(seekerId, numImps);
                         }
                     }
                     else if (impostors.Count > 0) numImps = impostors.Count;

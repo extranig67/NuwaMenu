@@ -203,7 +203,7 @@ private void DrawPlayersTab()
                 if (DrawFixedMenuButton("TP TO", activeTabStyle, playerActionThirdWidth, playerActionButtonHeight))
                 {
                     teleportToPlayer(target);
-                    ShowNotification($"<color=#00FF00>[TELEPORT]</color> РўРµР»РµРїРѕСЂС‚РёСЂРѕРІР°РЅ Рє <b>{target.Data.PlayerName}</b>!");
+                    ShowNotification($"<color=#00FF00>[TELEPORT]</color> Телепортирован к <b>{target.Data.PlayerName}</b>!");
                 }
 
                 GUILayout.Space(playerActionGap);
@@ -280,7 +280,7 @@ private void DrawPlayersTab()
                 {
                     if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
                     {
-                        ShowNotification("<color=#FF0000>[РћРЁРР‘РљРђ]</color> РўСЂРµР±СѓСЋС‚СЃСЏ РїСЂР°РІР° С…РѕСЃС‚Р°!");
+                        ShowNotification("<color=#FF0000>[ОШИБКА]</color> Требуются права хоста!");
                     }
                     else
                     {
@@ -412,6 +412,9 @@ private void DrawPlayersTab()
                 }
                 GUILayout.EndHorizontal();
 
+                if (GUILayout.Button("ADD TO BAN LIST", btnStyle, GUILayout.Height(25)))
+                    AddSelectedPlayerToBanList(target);
+
                 GUILayout.Space(8);
                 GUILayout.Label("Report reason:", new GUIStyle(GUI.skin.label) { fontSize = 11 });
                 GUILayout.BeginHorizontal();
@@ -479,9 +482,12 @@ private void DrawPlayersHistoryTab()
             if (GUILayout.Button("Clear History", btnStyle, GUILayout.Width(136), GUILayout.Height(24)))
             {
                 playerHistoryEntries.Clear();
+                playerHistoryEntryLookup.Clear();
+                playerHistoryViewRows.Clear();
                 playerHistoryKeysById.Clear();
                 playerHistoryKeysByClientId.Clear();
                 playerHistoryLoaded = true;
+                InvalidatePlayerHistoryViewCache();
                 WritePlayerHistoryFile();
             }
             GUILayout.EndHorizontal();
@@ -490,22 +496,35 @@ private void DrawPlayersHistoryTab()
             playersHistoryScroll = GUILayout.BeginScrollView(playersHistoryScroll);
             if (playerHistoryEntries.Count == 0)
             {
-                GUILayout.Label("<color=#777777>РСЃС‚РѕСЂРёСЏ РїРѕРєР° РїСѓСЃС‚Р°СЏ.</color>", new GUIStyle(GUI.skin.label) { richText = true, alignment = TextAnchor.MiddleCenter });
+                GUILayout.Label("<color=#777777>История пока пустая.</color>", new GUIStyle(GUI.skin.label) { richText = true, alignment = TextAnchor.MiddleCenter });
             }
             else
             {
-                foreach (var e in playerHistoryEntries.OrderByDescending(x => x.LastSeenUtc))
+                RebuildPlayerHistoryViewCache();
+
+                GUIStyle historyHeaderStyle = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13, clipping = TextClipping.Clip };
+                GUIStyle historyLineStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, clipping = TextClipping.Clip };
+                GUIStyle historyWrapStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = false, clipping = TextClipping.Clip };
+
+                int rowCount = playerHistoryViewRows.Count;
+                int firstIndex = Mathf.Clamp(Mathf.FloorToInt(playersHistoryScroll.y / PlayerHistoryRowHeight), 0, Mathf.Max(0, rowCount - 1));
+                int visibleRows = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(180f, windowRect.height - 170f) / PlayerHistoryRowHeight) + 3, 6, 30);
+                int endIndex = Mathf.Min(rowCount, firstIndex + visibleRows);
+
+                GUILayout.Space(firstIndex * PlayerHistoryRowHeight);
+                for (int i = firstIndex; i < endIndex; i++)
                 {
-                    GUILayout.BeginVertical();
-                    string status = e.IsOnline ? "<color=#55FF77>ONLINE</color>" : "<color=#aaaaaa>LEFT</color>";
-                    GUILayout.Label($"{e.Name}  {status}", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13 });
-                    GUILayout.Label($"Lv: {e.Level} | FC: {e.FriendCode} | PUID: {e.Puid}", new GUIStyle(GUI.skin.label) { fontSize = 11 });
-                    GUILayout.Label($"Joined: {e.FirstSeenUtc:HH:mm:ss} | Left: {(e.LeftUtc.HasValue ? e.LeftUtc.Value.ToString("HH:mm:ss") : "online")}", new GUIStyle(GUI.skin.label) { fontSize = 11 });
-                    GUILayout.Label($"Platform: {FormatPlatformHistory(e)}", new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true });
-                    GUILayout.Label($"RPC: {FormatRpcHistory(e)}", new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true });
+                    PlayerHistoryViewRow row = playerHistoryViewRows[i];
+                    GUILayout.BeginVertical(GUILayout.Height(PlayerHistoryRowHeight - 2f));
+                    GUILayout.Label(row.Header, historyHeaderStyle, GUILayout.Height(18));
+                    GUILayout.Label(row.Identity, historyLineStyle, GUILayout.Height(16));
+                    GUILayout.Label(row.Times, historyLineStyle, GUILayout.Height(16));
+                    GUILayout.Label(row.Platform, historyWrapStyle, GUILayout.Height(16));
+                    GUILayout.Label(row.Rpc, historyWrapStyle, GUILayout.Height(16));
                     GUILayout.EndVertical();
                     GUILayout.Space(2);
                 }
+                GUILayout.Space(Mathf.Max(0, rowCount - endIndex) * PlayerHistoryRowHeight);
             }
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
@@ -515,7 +534,7 @@ private void ForceGlobalEject(PlayerControl target)
         {
             if (target == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
             {
-                ShowNotification("<color=#FF0000>[ERROR]</color> РќСѓР¶РЅС‹ РїСЂР°РІР° РҐРѕСЃС‚Р°!");
+                ShowNotification("<color=#FF0000>[ERROR]</color> Нужны права Хоста!");
                 return;
             }
 
@@ -535,7 +554,7 @@ private void ForceGlobalEject(PlayerControl target)
 
                 MeetingHud.Instance.RpcClose();
 
-                ShowNotification($"<color=#00FF00>[EJECT]</color> РР·РіРѕРЅСЏРµРј <b>{target.Data.PlayerName}</b>...");
+                ShowNotification($"<color=#00FF00>[EJECT]</color> Изгоняем <b>{target.Data.PlayerName}</b>...");
             }
             catch (Exception)
             {
@@ -615,30 +634,30 @@ private static void AttemptReportBody(PlayerControl target)
                 if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                 {
                     PlayerControl.LocalPlayer.CmdReportDeadBody(target.Data);
-                    ShowNotification($"<color=#00FF00>[REPORT]</color> Р РµРїРѕСЂС‚ {target.Data.PlayerName}");
+                    ShowNotification($"<color=#00FF00>[REPORT]</color> Репорт {target.Data.PlayerName}");
                     return;
                 }
 
                 if (LobbyBehaviour.Instance != null)
                 {
-                    ShowNotification("<color=#FF0000>[REPORT]</color> РРіСЂР° РґРѕР»Р¶РЅР° РЅР°С‡Р°С‚СЊСЃСЏ.");
+                    ShowNotification("<color=#FF0000>[REPORT]</color> Игра должна начаться.");
                     return;
                 }
 
                 if (!target.Data.IsDead)
                 {
-                    ShowNotification("<color=#FF0000>[REPORT]</color> РњРѕР¶РЅРѕ СЂРµРїРѕСЂС‚РёС‚СЊ С‚РѕР»СЊРєРѕ РјРµСЂС‚РІС‹С… РёРіСЂРѕРєРѕРІ.");
+                    ShowNotification("<color=#FF0000>[REPORT]</color> Можно репортить только мертвых игроков.");
                     return;
                 }
 
                 if (!IsDeadBodyForPlayerPresent(target.PlayerId))
                 {
-                    ShowNotification("<color=#FF0000>[REPORT]</color> РўСЂСѓРї РЅРµ РЅР°Р№РґРµРЅ РёР»Рё СѓР¶Рµ РёСЃС‡РµР·.");
+                    ShowNotification("<color=#FF0000>[REPORT]</color> Труп не найден или уже исчез.");
                     return;
                 }
 
                 PlayerControl.LocalPlayer.CmdReportDeadBody(target.Data);
-                ShowNotification($"<color=#00FF00>[REPORT]</color> Р РµРїРѕСЂС‚ {target.Data.PlayerName}");
+                ShowNotification($"<color=#00FF00>[REPORT]</color> Репорт {target.Data.PlayerName}");
             }
             catch (Exception)
             {
@@ -649,13 +668,13 @@ private static void FloodPlayerWithTasks(PlayerControl target)
         {
             if (target == null || target.Data == null)
             {
-                ShowNotification("<color=#FF0000>[TASKS]</color> Р¦РµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°.");
+                ShowNotification("<color=#FF0000>[TASKS]</color> Цель не найдена.");
                 return;
             }
 
             if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
             {
-                ShowNotification("<color=#FF0000>[TASKS]</color> РќСѓР¶РЅС‹ РїСЂР°РІР° С…РѕСЃС‚Р°.");
+                ShowNotification("<color=#FF0000>[TASKS]</color> Нужны права хоста.");
                 return;
             }
 
@@ -664,7 +683,7 @@ private static void FloodPlayerWithTasks(PlayerControl target)
                 byte[] taskIds = new byte[255];
                 for (byte i = 0; i < 255; i++) taskIds[i] = i;
                 target.Data.RpcSetTasks(taskIds);
-                ShowNotification($"<color=#00FF00>[TASKS]</color> {target.Data.PlayerName} РїРѕР»СѓС‡РёР» flood tasks.");
+                ShowNotification($"<color=#00FF00>[TASKS]</color> {target.Data.PlayerName} получил flood tasks.");
             }
             catch (Exception)
             {
@@ -675,13 +694,13 @@ private static void FloodPlayerWithTasks(PlayerControl target)
         {
             if (target == null || target.Data == null)
             {
-                ShowNotification("<color=#FF0000>[TASKS]</color> Р¦РµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°.");
+                ShowNotification("<color=#FF0000>[TASKS]</color> Цель не найдена.");
                 return;
             }
 
             if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
             {
-                ShowNotification("<color=#FF0000>[TASKS]</color> РќСѓР¶РЅС‹ РїСЂР°РІР° С…РѕСЃС‚Р°.");
+                ShowNotification("<color=#FF0000>[TASKS]</color> Нужны права хоста.");
                 return;
             }
 
@@ -700,6 +719,43 @@ private static void FloodPlayerWithTasks(PlayerControl target)
             catch (Exception)
             {
             }
+        }
+
+private static void AddSelectedPlayerToBanList(PlayerControl target)
+        {
+            if (target == null || target.Data == null)
+            {
+                ShowNotification("<color=#FF0000>[BAN]</color> Player not found.");
+                return;
+            }
+
+            string friendCode = GetDisplayedFriendCode(target.Data, string.Empty);
+            if (string.IsNullOrWhiteSpace(friendCode))
+            {
+                ShowNotification("<color=#FF0000>[BAN]</color> Friend Code is unavailable.");
+                return;
+            }
+
+            if (IsFriendCodeBanned(friendCode))
+            {
+                ShowNotification($"<color=#FFD700>[BAN]</color> {friendCode} is already in ban list.");
+                return;
+            }
+
+            string puid = GetPlayerPuid(target);
+            if (string.IsNullOrWhiteSpace(puid) || puid == "Unknown") puid = "Unknown";
+
+            string playerName = target.Data.PlayerName;
+            if (string.IsNullOrWhiteSpace(playerName)) playerName = $"Player {target.PlayerId}";
+            playerName = Regex.Replace(playerName, "<.*?>", string.Empty);
+
+            if (string.IsNullOrEmpty(banListPath)) LoadBanList();
+            AddToBanList(friendCode, puid, playerName, "Player info button");
+
+            if (IsFriendCodeBanned(friendCode))
+                ShowNotification($"<color=#00FF00>[BAN]</color> {playerName} added to ban list.");
+            else
+                ShowNotification("<color=#FF0000>[BAN]</color> Failed to add player.");
         }
 
 private static void DeletePlayerTasks(PlayerControl target)
@@ -772,6 +828,7 @@ private static int CountPlayerTasks(PlayerControl target)
 private static List<byte> BuildRandomAssignableTaskIds(PlayerControl target)
         {
             List<byte> result = new List<byte>();
+            HashSet<byte> currentTaskIds = GetCurrentPlayerTaskIds(target);
             int commonCount = 0;
             int longCount = 0;
             int shortCount = 0;
@@ -796,9 +853,9 @@ private static List<byte> BuildRandomAssignableTaskIds(PlayerControl target)
             {
                 if (ShipStatus.Instance != null)
                 {
-                    AddRandomTaskTemplates(result, ShipStatus.Instance.CommonTasks, commonCount);
-                    AddRandomTaskTemplates(result, ShipStatus.Instance.LongTasks, longCount);
-                    AddRandomTaskTemplates(result, ShipStatus.Instance.ShortTasks, shortCount);
+                    AddRandomTaskTemplates(result, ShipStatus.Instance.CommonTasks, commonCount, currentTaskIds);
+                    AddRandomTaskTemplates(result, ShipStatus.Instance.LongTasks, longCount, currentTaskIds);
+                    AddRandomTaskTemplates(result, ShipStatus.Instance.ShortTasks, shortCount, currentTaskIds);
                 }
             }
             catch { }
@@ -806,37 +863,147 @@ private static List<byte> BuildRandomAssignableTaskIds(PlayerControl target)
             if (result.Count == 0)
             {
                 List<byte> fallback = GetLiveTaskTypeIds();
-                ShuffleByteList(fallback);
+                List<byte> preferred = new List<byte>();
+                List<byte> reused = new List<byte>();
+                foreach (byte taskId in fallback)
+                {
+                    if (currentTaskIds.Contains(taskId)) reused.Add(taskId);
+                    else preferred.Add(taskId);
+                }
+
+                ShuffleByteList(preferred);
+                ShuffleByteList(reused);
                 int desiredCount = Mathf.Clamp(currentCount > 0 ? currentCount : commonCount + longCount + shortCount, 1, 12);
-                if (fallback.Count > desiredCount)
-                    fallback.RemoveRange(desiredCount, fallback.Count - desiredCount);
-                return fallback;
+                List<byte> selected = new List<byte>();
+                AddTaskIdsUntilCount(selected, preferred, desiredCount);
+                AddTaskIdsUntilCount(selected, reused, desiredCount);
+                return selected;
             }
 
             return result;
         }
 
-private static void AddRandomTaskTemplates(List<byte> output, Il2CppReferenceArray<NormalPlayerTask> templates, int count)
+private static void AddRandomTaskTemplates(List<byte> output, Il2CppReferenceArray<NormalPlayerTask> templates, int count, HashSet<byte> excludedTaskIds = null)
         {
             if (output == null || templates == null || count <= 0) return;
 
-            List<byte> pool = new List<byte>();
+            List<byte> preferredPool = new List<byte>();
+            List<byte> reusedPool = new List<byte>();
             try
             {
                 foreach (NormalPlayerTask task in templates)
                 {
                     if (task == null) continue;
                     byte taskId = (byte)task.TaskType;
-                    if (!pool.Contains(taskId) && !output.Contains(taskId))
+                    if (!preferredPool.Contains(taskId) && !reusedPool.Contains(taskId) && !output.Contains(taskId))
+                    {
+                        List<byte> pool = excludedTaskIds != null && excludedTaskIds.Contains(taskId) ? reusedPool : preferredPool;
                         pool.Add(taskId);
+                    }
                 }
             }
             catch { }
 
-            ShuffleByteList(pool);
-            int take = Mathf.Min(count, pool.Count);
-            for (int i = 0; i < take; i++)
-                output.Add(pool[i]);
+            ShuffleByteList(preferredPool);
+            ShuffleByteList(reusedPool);
+            int startCount = output.Count;
+            AddTaskIdsUntilCount(output, preferredPool, startCount + count);
+            AddTaskIdsUntilCount(output, reusedPool, startCount + count);
+        }
+
+private static void AddTaskIdsUntilCount(List<byte> output, List<byte> pool, int desiredCount)
+        {
+            if (output == null || pool == null) return;
+            for (int i = 0; i < pool.Count && output.Count < desiredCount; i++)
+            {
+                byte taskId = pool[i];
+                if (!output.Contains(taskId))
+                    output.Add(taskId);
+            }
+        }
+
+private static HashSet<byte> GetCurrentPlayerTaskIds(PlayerControl target)
+        {
+            HashSet<byte> ids = new HashSet<byte>();
+            try
+            {
+                if (target?.Data?.Tasks != null)
+                {
+                    foreach (NetworkedPlayerInfo.TaskInfo task in target.Data.Tasks)
+                    {
+                        if (TryReadTaskInfoId(task, out byte taskId))
+                            ids.Add(taskId);
+                    }
+                }
+            }
+            catch { }
+
+            return ids;
+        }
+
+private static bool TryReadTaskInfoId(object taskInfo, out byte taskId)
+        {
+            taskId = 0;
+            if (taskInfo == null) return false;
+
+            string[] memberNames = { "TypeId", "TaskType", "TaskId", "Id", "taskType", "taskId" };
+            Type type = taskInfo.GetType();
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+            foreach (string memberName in memberNames)
+            {
+                try
+                {
+                    PropertyInfo property = type.GetProperty(memberName, flags);
+                    if (property != null && TryConvertTaskIdValue(property.GetValue(taskInfo, null), out taskId))
+                        return true;
+                }
+                catch { }
+
+                try
+                {
+                    FieldInfo field = type.GetField(memberName, flags);
+                    if (field != null && TryConvertTaskIdValue(field.GetValue(taskInfo), out taskId))
+                        return true;
+                }
+                catch { }
+            }
+
+            return false;
+        }
+
+private static bool TryConvertTaskIdValue(object value, out byte taskId)
+        {
+            taskId = 0;
+            if (value == null) return false;
+
+            try
+            {
+                if (value is byte byteValue)
+                {
+                    taskId = byteValue;
+                    return true;
+                }
+
+                if (value is TaskTypes taskType)
+                {
+                    taskId = (byte)taskType;
+                    return true;
+                }
+
+                if (value is Enum)
+                {
+                    taskId = Convert.ToByte(value);
+                    return true;
+                }
+
+                taskId = Convert.ToByte(value);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
 private static List<byte> GetLiveTaskTypeIds()
@@ -964,28 +1131,39 @@ private static bool TryGetForcedHideAndSeekSeekerId(out byte seekerId)
         {
             seekerId = byte.MaxValue;
             bool isHideAndSeek = IsHideAndSeekMode();
+            if (!enablePreGameRoleForce && !isHideAndSeek)
+                return false;
+
+            List<byte> forcedIds = GetForcedImpostorPlayerIds();
+            if (forcedIds.Count > 0)
+            {
+                if (runtimeHideAndSeekSeekerId != byte.MaxValue &&
+                    forcedIds.Contains(runtimeHideAndSeekSeekerId) &&
+                    IsPlayerIdActive(runtimeHideAndSeekSeekerId))
+                {
+                    seekerId = runtimeHideAndSeekSeekerId;
+                    return true;
+                }
+
+                seekerId = forcedIds[0];
+                return true;
+            }
+
             if (isHideAndSeek && runtimeHideAndSeekSeekerId != byte.MaxValue && IsPlayerIdActive(runtimeHideAndSeekSeekerId))
             {
                 seekerId = runtimeHideAndSeekSeekerId;
                 return true;
             }
 
-            if (!enablePreGameRoleForce && !isHideAndSeek)
-                return false;
-
-            List<byte> forcedIds = GetForcedImpostorPlayerIds();
-            if (forcedIds.Count == 0)
-                return false;
-
-            seekerId = forcedIds[0];
-            return true;
+            return false;
         }
 
-private static void SetHideAndSeekSeekerOption(byte seekerId)
+private static void SetHideAndSeekSeekerOption(byte seekerId, int impostorCount = 1)
         {
             try
             {
                 runtimeHideAndSeekSeekerId = seekerId;
+                impostorCount = Math.Max(1, impostorCount);
                 object options = GameOptionsManager.Instance?.CurrentGameOptions;
                 if (options == null) return;
 
@@ -1002,11 +1180,11 @@ private static void SetHideAndSeekSeekerOption(byte seekerId)
 
                 PropertyInfo numImpostorsProperty = type.GetProperty("NumImpostors", flags);
                 if (numImpostorsProperty != null && numImpostorsProperty.CanWrite)
-                    numImpostorsProperty.SetValue(options, 1, null);
+                    numImpostorsProperty.SetValue(options, impostorCount, null);
 
                 FieldInfo numImpostorsField = type.GetField("_NumImpostors_k__BackingField", flags);
                 if (numImpostorsField != null)
-                    numImpostorsField.SetValue(options, 1);
+                    numImpostorsField.SetValue(options, impostorCount);
             }
             catch { }
         }
@@ -1230,17 +1408,17 @@ public static void RevivePlayer(PlayerControl target)
         {
             if (target == null || target.Data == null)
             {
-                ShowNotification("<color=#FF0000>[РћРЁРР‘РљРђ]</color> Р¦РµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°!");
+                ShowNotification("<color=#FF0000>[ОШИБКА]</color> Цель не найдена!");
                 return;
             }
             if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
             {
-                ShowNotification("<color=#FF0000>[РћРЁРР‘РљРђ]</color> РўСЂРµР±СѓСЋС‚СЃСЏ РїСЂР°РІР° С…РѕСЃС‚Р°!");
+                ShowNotification("<color=#FF0000>[ОШИБКА]</color> Требуются права хоста!");
                 return;
             }
             if (!target.Data.IsDead)
             {
-                ShowNotification($"{target.Data.PlayerName} СѓР¶Рµ Р¶РёРІ!");
+                ShowNotification($"{target.Data.PlayerName} уже жив!");
                 return;
             }
 
@@ -1309,11 +1487,11 @@ public static void RevivePlayer(PlayerControl target)
                 var netObj = GameData.Instance?.GetComponent<InnerNetObject>();
                 if (netObj != null) netObj.SetDirtyBit(uint.MaxValue);
 
-                ShowNotification($"<color=#00FF00>[Р’РћРЎРљР Р•РЁР•РќРР•]</color> {target.Data.PlayerName} РІРѕСЃРєСЂРµС€С‘РЅ!");
+                ShowNotification($"<color=#00FF00>[ВОСКРЕШЕНИЕ]</color> {target.Data.PlayerName} воскрешён!");
             }
             catch (Exception)
             {
-                ShowNotification("<color=#FF0000>РћС€РёР±РєР° РІРѕСЃРєСЂРµС€РµРЅРёСЏ!</color>");
+                ShowNotification("<color=#FF0000>Ошибка воскрешения!</color>");
             }
         }
 }

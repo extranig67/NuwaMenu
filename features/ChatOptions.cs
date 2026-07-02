@@ -491,7 +491,15 @@ public static bool AnimEmptyGarbageEnabled = false;
 
 public static bool skipShhhAnim = false;
 
+public static bool skipRoleIntroAnim = false;
+
+public static bool skipKillAnimation = false;
+
 public static bool isManualMapSpawn = false;
+
+private static bool manualMapSpawnInProgress = false;
+
+private static int manualSpawnedMapId = -1;
 
 private void DrawAnimationsTab()
         {
@@ -522,6 +530,13 @@ private void DrawAnimationsTab()
             GUILayout.BeginHorizontal();
             AnimEmptyGarbageEnabled = DrawToggle(AnimEmptyGarbageEnabled, L("Empty Garbage", "Выкинуть мусор"), 250);
             skipShhhAnim = DrawToggle(skipShhhAnim, L("Skip 'Shhh!' Intro", "Пропустить 'Shhh!' интро"), 250);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(5);
+
+            GUILayout.BeginHorizontal();
+            skipRoleIntroAnim = DrawToggle(skipRoleIntroAnim, L("Skip Role Intro", "Пропустить выдачу ролей"), 250);
+            skipKillAnimation = DrawToggle(skipKillAnimation, L("Skip Kill Animation", "Пропустить анимацию килла"), 250);
             GUILayout.EndHorizontal();
 
             GUILayout.EndVertical();

@@ -305,7 +305,7 @@ private void DrawGeneralInfoTab()
                 GUILayout.Label($"<b><color=#{dangerHex}>{L("If you paid for this menu, demand a refund immediately.", "Если вы заплатили за это меню, требуйте возврат денег сразу.")}</color></b>", textStyle);
                 GUILayout.Label($"<b><color=#{safeHex}>{L("Make sure you are using the latest version from GitHub releases.", "Убедитесь, что используете последнюю версию из GitHub releases.")}</color></b>", textStyle);
                 GUILayout.Space(8);
-                GUILayout.Label($"<b><color=#{accentHex}>{L("Quick Hotkeys", "Быстрые клави��и")}</color></b>", textStyle);
+                GUILayout.Label($"<b><color=#{accentHex}>{L("Quick Hotkeys", "Быстрые клавиши")}</color></b>", textStyle);
                 string menuKeyText = (menuToggleKey == KeyCode.None ? KeyCode.Insert : menuToggleKey).ToString();
                 GUILayout.Label($"{L("Menu key", "Кнопка меню")}: <b>{menuKeyText}</b>", textStyle);
                 GUILayout.Label(L("Right Click: teleport to cursor", "ПКМ: телепорт к курсору"), textStyle);
@@ -667,6 +667,40 @@ private void DrawHostRoleBuffs(int width)
 private void DrawChatSettingsCompact(float columnWidth)
         {
             float contentWidth = Mathf.Clamp(columnWidth - 8f, 380f, 600f);
+            string[] selfChatSubTabs = { "SETTINGS", "PORTABLE" };
+            currentSelfChatSubTab = Mathf.Clamp(currentSelfChatSubTab, 0, selfChatSubTabs.Length - 1);
+
+            GUIStyle compactSubTab = new GUIStyle(subTabStyle)
+            {
+                fontSize = 10,
+                clipping = TextClipping.Clip,
+                wordWrap = false,
+                padding = CreateRectOffset(5, 5, 1, 1)
+            };
+            GUIStyle compactActiveSubTab = new GUIStyle(activeSubTabStyle)
+            {
+                fontSize = 10,
+                clipping = TextClipping.Clip,
+                wordWrap = false,
+                padding = CreateRectOffset(5, 5, 1, 1)
+            };
+
+            GUILayout.BeginHorizontal(GUILayout.Width(contentWidth));
+            for (int i = 0; i < selfChatSubTabs.Length; i++)
+            {
+                if (GUILayout.Button(selfChatSubTabs[i], currentSelfChatSubTab == i ? compactActiveSubTab : compactSubTab, GUILayout.Height(18)))
+                    currentSelfChatSubTab = i;
+                if (i < selfChatSubTabs.Length - 1) GUILayout.Space(4);
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Space(6);
+
+            if (currentSelfChatSubTab == 1)
+            {
+                DrawPortableChatTab();
+                return;
+            }
+
             float gap = 6f;
             int columns = contentWidth >= 560f ? 3 : 2;
             float blockWidth = Mathf.Floor((contentWidth - (gap * (columns - 1))) / columns);
@@ -787,7 +821,7 @@ private void DrawChatSettingsCompact(float columnWidth)
                 if (DrawPseudoInputButton(ghostChatColorHex, isEditingGhostChatColor, 20f, 16))
                 {
                     isEditingGhostChatColor = !isEditingGhostChatColor;
-                    if (isEditingGhostChatColor) ghostChatColorHex = FilterHexInput(ghostChatColorHex, 7);
+                    if (isEditingGhostChatColor) ghostChatColorHex = FilterGhostChatColorInput(ghostChatColorHex);
                     isEditingName = false;
                     isEditingLevel = false;
                     isEditingFriendCode = false;
@@ -798,7 +832,7 @@ private void DrawChatSettingsCompact(float columnWidth)
                 if (GUILayout.Button("OK", btnStyle, GUILayout.Width(30), GUILayout.Height(20)))
                 {
                     isEditingGhostChatColor = false;
-                    ghostChatColorHex = SanitizeHexColor(ghostChatColorHex, "#D7B8FF");
+                    ghostChatColorHex = SanitizeGhostChatColorSetting(ghostChatColorHex);
                     SaveConfig();
                 }
                 GUILayout.EndHorizontal();
@@ -879,7 +913,7 @@ private void DrawGhostChatColorControl(float width)
                 isEditingGhostChatColor = !isEditingGhostChatColor;
                 if (isEditingGhostChatColor)
                 {
-                    ghostChatColorHex = FilterHexInput(ghostChatColorHex, 7);
+                    ghostChatColorHex = FilterGhostChatColorInput(ghostChatColorHex);
                 }
                 isEditingName = false;
                 isEditingLevel = false;
@@ -891,13 +925,12 @@ private void DrawGhostChatColorControl(float width)
             if (GUILayout.Button(L("Apply", "OK"), btnStyle, GUILayout.Width(48), GUILayout.Height(24)))
             {
                 isEditingGhostChatColor = false;
-                ghostChatColorHex = SanitizeHexColor(ghostChatColorHex, "#D7B8FF");
+                ghostChatColorHex = SanitizeGhostChatColorSetting(ghostChatColorHex);
                 SaveConfig();
             }
             GUILayout.EndHorizontal();
 
-            string previewHex = GetGhostChatColorHex();
-            GUILayout.Label($"<color={previewHex}>{L("Preview ghost chat color", "Пример цвета чата призраков")}</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11, wordWrap = false, clipping = TextClipping.Clip }, GUILayout.Width(width), GUILayout.Height(16f));
+            GUILayout.Label(RenderGhostChatMessageText(L("Preview ghost chat color", "Пример цвета чата призраков")), new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11, wordWrap = false, clipping = TextClipping.Clip }, GUILayout.Width(width), GUILayout.Height(16f));
         }
 
 private void DrawPlayerMovement()

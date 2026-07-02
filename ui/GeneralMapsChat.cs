@@ -129,7 +129,63 @@ private void DrawMapsTab()
             GUILayout.EndVertical();
         }
 
+private int currentChatSubTab = 0;
+
+private int currentSelfChatSubTab = 0;
+
+private string[] chatSubTabs => new string[] { L("SETTINGS", "НАСТРОЙКИ"), L("PORTABLE", "ПОРТАТИВНЫЙ"), L("SYMBOLS", "СИМВОЛЫ") };
+
+public static List<string> portableChatLogs = new List<string>();
+
+public static string portableChatInput = string.Empty;
+
+public static bool isEditingPortableChat = false;
+
+private static string lastPortableChatLogKey = string.Empty;
+
+private static float lastPortableChatLogAt = -10f;
+
+private Vector2 portableChatScrollPos = Vector2.zero;
+
+private static int portableChatLogVersion = 0;
+
+private int seenPortableChatLogVersion = -1;
+
+private Vector2 symbolScrollPos = Vector2.zero;
+
+private static readonly string[] chatSymbolRows = new string[]
+{
+    "★ ☆ ✦ ✧ ✪ ✿ ♥ ♦ ♣ ♠",
+    "← → ↑ ↓ ↔ ↕ ✓ ✕ ! ?",
+    "α β γ δ λ π Ω ∞ ≠ ≈ ±",
+    "０ １ ２ ３ ４ ５ ６ ７ ８ ９"
+};
+
 private void DrawChatSettingsTab()
+        {
+            currentChatSubTab = Mathf.Clamp(currentChatSubTab, 0, chatSubTabs.Length - 1);
+
+            GUILayout.BeginVertical();
+            GUILayout.BeginHorizontal();
+            for (int i = 0; i < chatSubTabs.Length; i++)
+            {
+                if (GUILayout.Button(chatSubTabs[i], currentChatSubTab == i ? activeSubTabStyle : subTabStyle, GUILayout.Height(22), GUILayout.ExpandWidth(true)))
+                {
+                    currentChatSubTab = i;
+                    scrollPosition = Vector2.zero;
+                }
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Space(10);
+
+            if (currentChatSubTab == 0) DrawChatSettingsContent();
+            else if (currentChatSubTab == 1) DrawPortableChatTab();
+            else if (currentChatSubTab == 2) DrawChatSymbolsTab();
+
+            GUILayout.EndVertical();
+        }
+
+private void DrawChatSettingsContent()
         {
             GUILayout.BeginVertical(boxStyle);
             GUILayout.Label(L("CHAT SETTINGS & LOGS", "НАСТРОЙКИ ЧАТА И ЛОГИ"), headerStyle);
@@ -322,18 +378,285 @@ private void DrawChatSettingsTab()
             GUILayout.EndVertical();
         }
 
-private void TrySendCustomChatMessage(string rawText)
+private void DrawPortableChatTab()
         {
-            if (string.IsNullOrWhiteSpace(rawText)) return;
-            if (PlayerControl.LocalPlayer == null) return;
+            GUILayout.BeginVertical(menuCardStyle, GUILayout.ExpandHeight(false));
+            DrawMenuSectionHeader(L("PORTABLE CHAT", "ПОРТАТИВНЫЙ ЧАТ"));
+            GUILayout.Label(L("Read recent messages and send chat without opening the game chat panel.", "Читайте последние сообщения и отправляйте чат без открытия игровой панели."), menuDescStyle);
+            GUILayout.Space(8);
+
+            GUIStyle logBoxStyle = new GUIStyle(boxStyle);
+            if (texInputBg != null) logBoxStyle.normal.background = texInputBg;
+            logBoxStyle.padding = CreateRectOffset(8, 8, 6, 6);
+            logBoxStyle.margin = CreateRectOffset(0, 0, 0, 0);
+
+            float logHeight = Mathf.Clamp(windowRect.height - 235f, 120f, 285f);
+            if (seenPortableChatLogVersion != portableChatLogVersion)
+            {
+                portableChatScrollPos.y = float.MaxValue;
+                seenPortableChatLogVersion = portableChatLogVersion;
+            }
+
+            GUILayout.BeginVertical(logBoxStyle, GUILayout.ExpandWidth(true), GUILayout.Height(logHeight));
+            portableChatScrollPos = GUILayout.BeginScrollView(portableChatScrollPos, false, true, GUIStyle.none, GUI.skin.verticalScrollbar, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            if (portableChatLogs.Count == 0)
+            {
+                GUIStyle emptyStyle = new GUIStyle(menuDescStyle)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 12,
+                    wordWrap = true
+                };
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(L("No messages yet.", "Сообщений пока нет."), emptyStyle, GUILayout.ExpandWidth(true));
+                GUILayout.FlexibleSpace();
+            }
+            else
+            {
+                GUIStyle rowStyle = new GUIStyle(GUI.skin.label)
+                {
+                    richText = true,
+                    wordWrap = true,
+                    fontSize = 12,
+                    normal = { textColor = whiteMenuTheme ? new Color(0.12f, 0.12f, 0.12f, 1f) : new Color(0.9f, 0.9f, 0.9f, 1f) }
+                };
+
+                foreach (string log in portableChatLogs)
+                    GUILayout.Label(log, rowStyle);
+            }
+            GUILayout.EndScrollView();
+            GUILayout.EndVertical();
+
+            GUILayout.Space(8);
+            DrawChatTextInput(ref portableChatInput, ref isEditingPortableChat, L("Type a message...", "Введите сообщение..."), 120);
+            GUILayout.Space(8);
+
+            GUILayout.BeginHorizontal(GUILayout.Height(28));
+            if (GUILayout.Button(L("Send", "Отправить"), btnStyle, GUILayout.Width(120), GUILayout.Height(28)))
+                SendPortableChatMessage();
+
+            if (GUILayout.Button(L("Clear Log", "Очистить лог"), btnStyle, GUILayout.Width(120), GUILayout.Height(28)))
+            {
+                portableChatLogs.Clear();
+                lastPortableChatLogKey = string.Empty;
+                lastPortableChatLogAt = -10f;
+                portableChatLogVersion++;
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+
+private void DrawChatSymbolsTab()
+        {
+            GUILayout.BeginVertical(menuCardStyle);
+            DrawMenuSectionHeader(L("SYMBOL KEYBOARD", "КЛАВИАТУРА СИМВОЛОВ"));
+            GUILayout.Label(L("Click a symbol to append it to the portable chat and the in-game chat input.", "Нажмите символ, чтобы добавить его в портативный и игровой ввод чата."), menuDescStyle);
+            GUILayout.Space(8);
+
+            symbolScrollPos = GUILayout.BeginScrollView(symbolScrollPos, false, true, GUIStyle.none, GUI.skin.verticalScrollbar, GUIStyle.none);
+            foreach (string row in chatSymbolRows)
+            {
+                GUILayout.BeginHorizontal();
+                string[] symbols = row.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string symbol in symbols)
+                {
+                    if (GUILayout.Button(symbol, btnStyle, GUILayout.Width(42), GUILayout.Height(34)))
+                        InsertSymbolIntoChatInputs(symbol);
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+                GUILayout.Space(4);
+            }
+            GUILayout.EndScrollView();
+
+            GUILayout.Space(8);
+            DrawChatTextInput(ref portableChatInput, ref isEditingPortableChat, L("Symbol output...", "Вывод символов..."), 120);
+            GUILayout.Space(8);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(L("Send", "Отправить"), btnStyle, GUILayout.Width(120), GUILayout.Height(28)))
+                SendPortableChatMessage();
+            if (GUILayout.Button(L("Backspace", "Удалить"), btnStyle, GUILayout.Width(120), GUILayout.Height(28)) && !string.IsNullOrEmpty(portableChatInput))
+                portableChatInput = portableChatInput.Substring(0, portableChatInput.Length - 1);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+
+private void DrawChatTextInput(ref string input, ref bool focused, string placeholder, int maxLength)
+        {
+            GUIStyle fieldStyle = new GUIStyle(GUI.skin.textField)
+            {
+                fontSize = 12,
+                alignment = TextAnchor.MiddleLeft,
+                clipping = TextClipping.Clip,
+                padding = CreateRectOffset(12, 12, 8, 8)
+            };
+            fieldStyle.normal.textColor = whiteMenuTheme ? new Color(0.12f, 0.12f, 0.12f, 1f) : new Color(0.9f, 0.9f, 0.9f, 1f);
+
+            Rect inputRect = GUILayoutUtility.GetRect(10f, 34f, GUILayout.ExpandWidth(true), GUILayout.Height(34));
+            GUI.Box(inputRect, string.Empty, fieldStyle);
+
+            string drawText = string.IsNullOrEmpty(input) ? placeholder : input;
+            if (focused && (Time.unscaledTime % 1f) < 0.5f) drawText += "|";
+
+            GUIStyle textStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                clipping = TextClipping.Clip,
+                richText = false,
+                fontSize = 12
+            };
+            textStyle.normal.textColor = whiteMenuTheme ? new Color(0.12f, 0.12f, 0.12f, 1f) : new Color(0.9f, 0.9f, 0.9f, 1f);
+            GUI.Label(new Rect(inputRect.x + 12f, inputRect.y + 4f, inputRect.width - 24f, inputRect.height - 8f), drawText, textStyle);
+
+            Event e = Event.current;
+            if (e == null) return;
+
+            if (e.type == EventType.MouseDown)
+            {
+                focused = inputRect.Contains(e.mousePosition);
+                if (focused) e.Use();
+            }
+            else if (focused && e.type == EventType.KeyDown)
+            {
+                if (HandleClipboardShortcut(e, ref input, maxLength))
+                {
+                }
+                else if (e.keyCode == KeyCode.Backspace)
+                {
+                    if (!string.IsNullOrEmpty(input))
+                        input = input.Substring(0, input.Length - 1);
+                    e.Use();
+                }
+                else if (e.keyCode == KeyCode.Escape)
+                {
+                    focused = false;
+                    e.Use();
+                }
+                else if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+                {
+                    SendPortableChatMessage();
+                    e.Use();
+                }
+                else if (!char.IsControl(e.character))
+                {
+                    if (input == null) input = string.Empty;
+                    if (input.Length < maxLength)
+                        input += e.character;
+                    e.Use();
+                }
+            }
+        }
+
+private void SendPortableChatMessage()
+        {
+            if (TrySendCustomChatMessage(portableChatInput))
+            {
+                portableChatInput = string.Empty;
+                isEditingPortableChat = false;
+                portableChatScrollPos.y = float.MaxValue;
+            }
+        }
+
+private void InsertSymbolIntoChatInputs(string symbol)
+        {
+            if (string.IsNullOrEmpty(symbol)) return;
+
+            if ((portableChatInput?.Length ?? 0) + symbol.Length <= 120)
+                portableChatInput = (portableChatInput ?? string.Empty) + symbol;
+
+            try
+            {
+                TextBoxTMP textArea = HudManager.Instance?.Chat?.freeChatField?.textArea;
+                if (textArea != null && (textArea.text?.Length ?? 0) + symbol.Length <= 120)
+                    textArea.text = (textArea.text ?? string.Empty) + symbol;
+            }
+            catch { }
+        }
+
+public static void AddPortableChatLog(PlayerControl sourcePlayer, string chatText)
+        {
+            if (string.IsNullOrWhiteSpace(chatText)) return;
+
+            try
+            {
+                string time = DateTime.Now.ToString("HH:mm:ss");
+                string name = "System";
+                bool isLocal = false;
+                bool isDead = false;
+                int sourceId = -1;
+
+                if (sourcePlayer != null && sourcePlayer.Data != null)
+                {
+                    name = sourcePlayer.Data.PlayerName ?? "Player";
+                    isLocal = sourcePlayer == PlayerControl.LocalPlayer;
+                    isDead = sourcePlayer.Data.IsDead;
+                    sourceId = sourcePlayer.PlayerId;
+                }
+
+                string safeName = CleanPortableChatText(name, 24);
+                string safeText = CleanPortableChatText(chatText, 220);
+                if (string.IsNullOrEmpty(safeText)) return;
+
+                float now = Time.unscaledTime;
+                string logKey = sourceId + "|" + safeText;
+                if (logKey == lastPortableChatLogKey && now - lastPortableChatLogAt < 0.75f)
+                    return;
+                lastPortableChatLogKey = logKey;
+                lastPortableChatLogAt = now;
+
+                string timeColor = whiteMenuTheme ? "666666" : "888888";
+                string nameColor = isLocal
+                    ? (whiteMenuTheme ? "007CA6" : "59D8FF")
+                    : (isDead ? (whiteMenuTheme ? "7A4DCF" : "D7B8FF") : (whiteMenuTheme ? "222222" : "EAEAEA"));
+                string textColor = whiteMenuTheme ? "222222" : "EAEAEA";
+                portableChatLogs.Add($"<color=#{timeColor}>[{time}]</color> <color=#{nameColor}>{safeName}</color>: <color=#{textColor}>{safeText}</color>");
+
+                while (portableChatLogs.Count > 80)
+                    portableChatLogs.RemoveAt(0);
+
+                portableChatLogVersion++;
+            }
+            catch { }
+        }
+
+private static string CleanPortableChatText(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            string clean = Regex.Replace(value, "<.*?>", string.Empty)
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Replace("<", "(")
+                .Replace(">", ")");
+            if (clean.Length > maxLength)
+                clean = clean.Substring(0, maxLength - 3) + "...";
+            return clean;
+        }
+
+private bool TrySendCustomChatMessage(string rawText)
+        {
+            if (string.IsNullOrWhiteSpace(rawText)) return false;
+            if (PlayerControl.LocalPlayer == null)
+            {
+                AddPortableChatLog(null, L("Cannot send: local player is not ready.", "Нельзя отправить: локальный игрок не готов."));
+                return false;
+            }
 
             try
             {
                 string message = rawText.Trim();
                 if (enableChatHistory) ChatHistory.Remember(message);
                 PlayerControl.LocalPlayer.RpcSendChat(message);
+                AddPortableChatLog(PlayerControl.LocalPlayer, message);
+                return true;
             }
-            catch { }
+            catch
+            {
+                AddPortableChatLog(null, L("Failed to send message.", "Не удалось отправить сообщение."));
+                return false;
+            }
         }
 
 private static readonly HashSet<string> BasicSpellDictionary = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -383,7 +706,9 @@ private static void UpsertPlayerHistory(PlayerControl pc)
                 string puid = hasSnapshot ? snapshot.Puid : "Unknown";
                 string platform = hasSnapshot ? snapshot.Platform : "Unknown";
                 string customPlatform = hasSnapshot ? snapshot.CustomPlatform : "";
-                int level = hasSnapshot ? snapshot.Level : 1;
+                int level;
+                if (!TryGetPlayerDisplayLevel(pc, hasSnapshot ? snapshot : null, out level))
+                    level = 1;
 
                 string key = BuildPlayerHistoryKey(pc.Data.ClientId, fc, puid, name);
                 var item = FindPlayerHistoryEntry(key, pc.Data.ClientId, fc, puid, name);
@@ -427,6 +752,7 @@ private static void UpsertPlayerHistory(PlayerControl pc)
                 }
                 playerHistoryKeysById[pc.PlayerId] = key;
                 playerHistoryKeysByClientId[pc.Data.ClientId] = key;
+                IndexPlayerHistoryEntry(item, pc.Data.ClientId);
                 if (changed) WritePlayerHistoryFile();
             }
             catch { }
@@ -481,7 +807,50 @@ private static bool IsSafeIdentityComplete(SafePlayerIdentitySnapshot snapshot)
             return snapshot != null &&
                    !string.IsNullOrWhiteSpace(snapshot.Name) && snapshot.Name != "Unknown" &&
                    !string.IsNullOrWhiteSpace(snapshot.FriendCode) && snapshot.FriendCode != "Hidden" &&
-                   !string.IsNullOrWhiteSpace(snapshot.Puid) && snapshot.Puid != "Unknown";
+                   !string.IsNullOrWhiteSpace(snapshot.Puid) && snapshot.Puid != "Unknown" &&
+                   snapshot.Level > 0;
+        }
+
+private static bool TryGetPlayerDisplayLevel(PlayerControl player, SafePlayerIdentitySnapshot snapshot, out int level)
+        {
+            level = 0;
+
+            try
+            {
+                if (player != null && player.Data != null)
+                {
+                    uint rawLevel = player.Data.PlayerLevel;
+                    if (rawLevel != uint.MaxValue && rawLevel < 10000)
+                    {
+                        level = (int)rawLevel + 1;
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                ClientData client = AmongUsClient.Instance?.GetClientFromCharacter(player);
+                if (client != null)
+                {
+                    uint rawLevel = client.PlayerLevel;
+                    if (rawLevel != uint.MaxValue && rawLevel < 10000)
+                    {
+                        level = (int)rawLevel + 1;
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            if (snapshot != null && snapshot.Level > 0)
+            {
+                level = snapshot.Level;
+                return true;
+            }
+
+            return false;
         }
 
 private static string BuildPlayerHistoryKey(int clientId, string friendCode, string puid, string name)
@@ -508,10 +877,16 @@ private static PlayerHistoryEntry FindPlayerHistoryEntry(string key, int clientI
         {
             if (string.IsNullOrWhiteSpace(key)) return null;
 
-            return playerHistoryEntries.FirstOrDefault(x =>
+            if (playerHistoryEntryLookup.TryGetValue(key, out PlayerHistoryEntry direct))
+                return direct;
+
+            PlayerHistoryEntry found = playerHistoryEntries.FirstOrDefault(x =>
                 BuildPlayerHistoryKey(clientId, x.FriendCode, x.Puid, x.Name) == key ||
                 (!string.IsNullOrWhiteSpace(puid) && puid != "Unknown" && x.Puid == puid) ||
                 (!string.IsNullOrWhiteSpace(friendCode) && friendCode != "Hidden" && x.FriendCode == friendCode && x.Name == name));
+            if (found != null)
+                IndexPlayerHistoryEntry(found, clientId);
+            return found;
         }
 
 private static bool IsLocalClientId(int clientId)
@@ -672,6 +1047,49 @@ private static string FormatPlatformHistory(PlayerHistoryEntry entry)
                 : $"{entry.Platform} + custom: {entry.CustomPlatform}";
         }
 
+private static void InvalidatePlayerHistoryViewCache()
+        {
+            playerHistoryViewDirty = true;
+        }
+
+private static void IndexPlayerHistoryEntry(PlayerHistoryEntry entry, int clientId = -1)
+        {
+            if (entry == null) return;
+
+            string key = BuildPlayerHistoryKey(clientId, entry.FriendCode, entry.Puid, entry.Name);
+            if (!string.IsNullOrWhiteSpace(key))
+                playerHistoryEntryLookup[key] = entry;
+
+            string puid = NormalizeHistoryIdentity(entry.Puid);
+            if (!string.IsNullOrEmpty(puid) && puid != "unknown")
+                playerHistoryEntryLookup[$"puid:{puid}"] = entry;
+
+            string friendCode = NormalizeHistoryIdentity(entry.FriendCode);
+            if (!string.IsNullOrEmpty(friendCode) && friendCode != "hidden" && friendCode != "unknown")
+                playerHistoryEntryLookup[$"fc:{friendCode}"] = entry;
+        }
+
+private static void RebuildPlayerHistoryViewCache()
+        {
+            if (!playerHistoryViewDirty) return;
+
+            playerHistoryViewRows.Clear();
+            foreach (var e in playerHistoryEntries.OrderByDescending(x => x.LastSeenUtc))
+            {
+                string status = e.IsOnline ? "<color=#55FF77>ONLINE</color>" : "<color=#aaaaaa>LEFT</color>";
+                playerHistoryViewRows.Add(new PlayerHistoryViewRow
+                {
+                    Header = $"{e.Name}  {status}",
+                    Identity = $"Lv: {e.Level} | FC: {e.FriendCode} | PUID: {e.Puid}",
+                    Times = $"Joined: {e.FirstSeenUtc:HH:mm:ss} | Left: {(e.LeftUtc.HasValue ? e.LeftUtc.Value.ToString("HH:mm:ss") : "online")}",
+                    Platform = $"Platform: {FormatPlatformHistory(e)}",
+                    Rpc = $"RPC: {FormatRpcHistory(e)}"
+                });
+            }
+
+            playerHistoryViewDirty = false;
+        }
+
 private static string PlayerHistoryFilePath()
         {
             string folder = string.IsNullOrWhiteSpace(Plugin.ElysiumFolder)
@@ -691,7 +1109,7 @@ private static void EnsurePlayerHistoryLoaded()
                 if (!System.IO.File.Exists(path)) return;
 
                 PlayerHistoryEntry current = null;
-                foreach (string rawLine in System.IO.File.ReadAllLines(path, Encoding.UTF8))
+                foreach (string rawLine in System.IO.File.ReadLines(path, Encoding.UTF8))
                 {
                     string line = rawLine ?? string.Empty;
                     if (line.StartsWith("Nick: "))
@@ -774,6 +1192,7 @@ private static void EnsurePlayerHistoryLoaded()
                 }
 
                 AddLoadedPlayerHistoryEntry(current);
+                InvalidatePlayerHistoryViewCache();
             }
             catch { }
         }
@@ -783,10 +1202,12 @@ private static void AddLoadedPlayerHistoryEntry(PlayerHistoryEntry entry)
             if (entry == null || string.IsNullOrWhiteSpace(entry.Name)) return;
 
             string key = BuildPlayerHistoryKey(-1, entry.FriendCode, entry.Puid, entry.Name);
-            var existing = playerHistoryEntries.FirstOrDefault(x => BuildPlayerHistoryKey(-1, x.FriendCode, x.Puid, x.Name) == key);
+            var existing = FindPlayerHistoryEntry(key, -1, entry.FriendCode, entry.Puid, entry.Name);
             if (existing == null)
             {
                 playerHistoryEntries.Add(entry);
+                IndexPlayerHistoryEntry(entry);
+                InvalidatePlayerHistoryViewCache();
                 return;
             }
 
@@ -802,6 +1223,7 @@ private static void AddLoadedPlayerHistoryEntry(PlayerHistoryEntry entry)
                 existing.LastSeenUtc = entry.LastSeenUtc;
                 existing.LeftUtc = entry.LeftUtc;
                 existing.IsOnline = false;
+                InvalidatePlayerHistoryViewCache();
             }
 
             foreach (byte rpc in entry.RpcCalls)
@@ -810,6 +1232,7 @@ private static void AddLoadedPlayerHistoryEntry(PlayerHistoryEntry entry)
                     existing.RpcCalls.Add(rpc);
             }
             existing.RpcCalls.Sort();
+            IndexPlayerHistoryEntry(existing);
         }
 
 private static void MarkPlayerHistoryLeft(byte playerId)
@@ -817,7 +1240,7 @@ private static void MarkPlayerHistoryLeft(byte playerId)
             try
             {
                 if (!playerHistoryKeysById.TryGetValue(playerId, out string key)) return;
-                var item = playerHistoryEntries.FirstOrDefault(x => BuildPlayerHistoryKey(-1, x.FriendCode, x.Puid, x.Name) == key);
+                var item = FindPlayerHistoryEntry(key, -1, null, null, null);
                 if (item == null || !item.IsOnline) return;
 
                 item.IsOnline = false;
@@ -833,7 +1256,7 @@ private static void MarkPlayerHistoryLeftByClientId(int clientId)
             try
             {
                 if (!playerHistoryKeysByClientId.TryGetValue(clientId, out string key)) return;
-                var item = playerHistoryEntries.FirstOrDefault(x => BuildPlayerHistoryKey(clientId, x.FriendCode, x.Puid, x.Name) == key);
+                var item = FindPlayerHistoryEntry(key, clientId, null, null, null);
                 if (item == null || !item.IsOnline) return;
 
                 item.IsOnline = false;
@@ -854,7 +1277,7 @@ public static void RecordPlayerRpc(PlayerControl pc, byte callId)
                 UpsertPlayerHistory(pc);
 
                 if (!playerHistoryKeysById.TryGetValue(pc.PlayerId, out string key)) return;
-                var item = playerHistoryEntries.FirstOrDefault(x => BuildPlayerHistoryKey(pc.Data.ClientId, x.FriendCode, x.Puid, x.Name) == key);
+                var item = FindPlayerHistoryEntry(key, pc.Data.ClientId, null, null, null);
                 if (item == null) return;
 
                 if (!item.RpcCalls.Contains(callId))
@@ -877,6 +1300,8 @@ private static string FormatRpcHistory(PlayerHistoryEntry entry)
 
 private static void WritePlayerHistoryFile()
         {
+            InvalidatePlayerHistoryViewCache();
+
             try
             {
                 string path = PlayerHistoryFilePath();
@@ -1026,6 +1451,8 @@ private void DrawAntiCheatTab()
             GUILayout.Space(5);
             blockChatFloodRpc = DrawToggle(blockChatFloodRpc, L("Block Chat RPC Flood", "Блокировать флуд RPC чата"), antiCheatToggleWidth);
             GUILayout.Space(5);
+            overflowProtection = DrawToggle(overflowProtection, "Overflow Protection", antiCheatToggleWidth);
+            GUILayout.Space(5);
             enablePasosLimit = DrawToggle(enablePasosLimit, L("RPC Anti-Cheat", "RPC Античит"), antiCheatToggleWidth);
             GUILayout.Space(5);
             oldAntiCheatVersion = DrawToggle(oldAntiCheatVersion, L("anti-cheat old version", "anti-cheat old version"), antiCheatToggleWidth);
@@ -1040,6 +1467,8 @@ private void DrawAntiCheatTab()
             DrawMenuSectionHeader(L("OTHER PROTECTIONS", "ПРОЧАЯ ЗАЩИТА"));
 
             disableVoteKicks = DrawToggle(disableVoteKicks, L("Disable Vote Kicks (Host)", "Запрет кика голосованием (Хост)"), antiCheatToggleWidth);
+            GUILayout.Space(5);
+            banVoteKickVoters = DrawToggle(banVoteKickVoters, L("Ban Vote-Kick Voters (Host)", "Бан за vote-kick (Хост)"), antiCheatToggleWidth);
             GUILayout.Space(5);
 
             autoKickBugs = DrawToggle(autoKickBugs, L("Auto-Kick Fortegreen", "Авто-кик багнутых игроков"), antiCheatToggleWidth);

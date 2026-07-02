@@ -59,6 +59,7 @@ using UnityEngine;
 internal static class ModOptions
 {
 	internal static readonly AcovOption<bool> NetworkProtection = new AcovOption<bool>(() => ElysiumModMenu.ElysiumModMenuGUI.oldAntiCheatVersion);
+	internal static readonly AcovOption<bool> NetIdOverflowProtection = new AcovOption<bool>(() => ElysiumModMenu.ElysiumModMenuGUI.overflowProtection);
 	internal static readonly AcovOption<bool> FloodDropNonHost = new AcovOption<bool>(() => true);
 	internal static readonly AcovOption<bool> NonHostDataDrop = new AcovOption<bool>(() => true);
 	internal static readonly AcovOption<bool> LobbyTeleportDetection = new AcovOption<bool>(() => true);

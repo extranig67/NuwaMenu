@@ -188,6 +188,7 @@ public class ModPlayer : MonoBehaviour
                                DestroyableSingleton<HudManager>.Instance.Notifier.AddDisconnectMessage($"<color=#FFFF00>Received Rpc from <b>{player.Data.PlayerName}</b>, {b}\nthat shouldn't be got like that way</color>");
                                 if (enablePasosLimit)
                                 {
+                                    ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(player.OwnerId, player.Data.PlayerName, $"Invalid targeted RPC ({b})", true);
                                     AmongUsClient.Instance.KickPlayer(player.OwnerId, true);
                                 }
                             }, 2f);
@@ -210,6 +211,7 @@ public class ModPlayer : MonoBehaviour
 
                                 if (enablePasosLimit)
                                 {
+                                    ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(player.OwnerId, player.Data.PlayerName, $"Game RPC in lobby ({b})", true);
                                     AmongUsClient.Instance.KickPlayer(player.OwnerId, true);
                                 }
                             }, 2f);
@@ -306,6 +308,7 @@ public class ModPlayer : MonoBehaviour
                         {
                             if (enablePasosLimit)
                             {
+                                ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(player.OwnerId, player.Data != null ? player.Data.PlayerName : player.name, $"RPC spam ({(RpcCalls)callId})", true);
                                 AmongUsClient.Instance.KickPlayer(player.OwnerId, true);
                             }
                             if (!isMarkedAsSpamRpc && player != PlayerControl.LocalPlayer)
@@ -411,6 +414,7 @@ public class ModPlayer : MonoBehaviour
                         if (banMalformedPacketSender)
                         {
                             KeyValuePair<int, float> keyValuePair = HandleMessage.LastJoin.OrderBy((KeyValuePair<int, float> pair) => pair.Value).FirstOrDefault();
+                            ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(keyValuePair.Key, $"Client {keyValuePair.Key}", $"Malformed packet: {reason}", true);
 		                    AmongUsClient.Instance.KickPlayer(keyValuePair.Key, ban: true);
                         }
                     }, 0.1f);

@@ -847,6 +847,13 @@ private static bool Enabled()
 			&& AmongUsClient.Instance.AmHost;
 	}
 
+private static bool NetIdOverflowProtectionEnabled()
+	{
+		return (ModOptions.NetIdOverflowProtection == null || ModOptions.NetIdOverflowProtection.Value)
+			&& AmongUsClient.Instance != null
+			&& AmongUsClient.Instance.AmHost;
+	}
+
 private static bool EnabledNonHostFloodDrop()
 	{
 		return ModOptions.FloodDropNonHost != null
@@ -976,6 +983,49 @@ private static void BlockMessage(int clientId, string title, string detail, stri
 		ApplyProtectionAction(clientId, title, detail, action);
 	}
 
+private static void BlockNetIdOverflow(int clientId, string detail)
+	{
+		clientId = ResolveNetIdOverflowSenderClientId(clientId);
+		string title = "Anticheat Overflow Ban";
+		if (clientId < 0 || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
+		{
+			if (ShouldShowProtectionNotice(clientId, title, detail))
+			{
+				AcovPlugin.Logger?.LogWarning((object)$"Network protection dropped NetId overflow with unreliable sender: {detail}");
+				AcovSecurityNotifications.Show("Warn", null, title, detail, clientId);
+			}
+			return;
+		}
+
+		float now = Time.realtimeSinceStartup;
+		if (NetIdOverflowActionUntilByClient.TryGetValue(clientId, out float clientUntil) && now < clientUntil)
+		{
+			return;
+		}
+
+		if (!string.IsNullOrWhiteSpace(activeInboundConnectionKey) &&
+			NetIdOverflowActionUntilByConnection.TryGetValue(activeInboundConnectionKey, out float connectionUntil) &&
+			now < connectionUntil)
+		{
+			return;
+		}
+
+		NetIdOverflowActionUntilByClient[clientId] = now + NetIdOverflowActionCooldownSeconds;
+		if (!string.IsNullOrWhiteSpace(activeInboundConnectionKey))
+		{
+			NetIdOverflowActionUntilByConnection[activeInboundConnectionKey] = now + NetIdOverflowActionCooldownSeconds;
+		}
+
+		bool shouldNotify = ShouldShowProtectionNotice(clientId, title, detail);
+		if (shouldNotify)
+		{
+			AcovPlugin.Logger?.LogWarning((object)$"Network protection blocked NetId overflow from client {clientId}: {detail}");
+			AcovSecurityNotifications.Show("Ban", ClientName(clientId), title, detail, clientId);
+		}
+
+		DisconnectIfHost(clientId, false, title, detail, true);
+	}
+
 private static bool ShouldShowProtectionNotice(int clientId, string title, string detail)
 	{
 		float now = Time.realtimeSinceStartup;
@@ -1087,6 +1137,11 @@ private static void ApplyProtectionAction(int clientId, string attackType, strin
 
 private static void DisconnectIfHost(int clientId, bool ban, string attackType, string detail)
 	{
+		DisconnectIfHost(clientId, ban, attackType, detail, ban);
+	}
+
+private static void DisconnectIfHost(int clientId, bool ban, string attackType, string detail, bool addToLocalBanList)
+	{
 		if (clientId < 0 || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
 		{
 			return;
@@ -1109,7 +1164,7 @@ private static void DisconnectIfHost(int clientId, bool ban, string attackType, 
 		RecentJoinSenderCandidates.Remove(clientId);
 		try
 		{
-			if (ban)
+			if (addToLocalBanList)
 			{
 				ClientData target = GetClientById(clientId) ?? GetRecentClient(client, clientId);
 				if (!AcovAccessLists.AddBanClient(target, $"{attackType}: {detail}") && TryGetSnapshotIdentity(clientId, out AcovClientIdentity identity))
@@ -1118,6 +1173,8 @@ private static void DisconnectIfHost(int clientId, bool ban, string attackType, 
 				}
 			}
 
+			string reason = string.IsNullOrWhiteSpace(detail) ? attackType : $"{attackType}: {detail}";
+			ElysiumModMenu.ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(clientId, ClientName(clientId), reason, ban);
 			client.KickPlayer(clientId, ban);
 			AcovPlugin.Logger?.LogWarning((object)$"Network protection sent {(ban ? "ban" : "kick")} for client {clientId}.");
 			QueueLocalCleanup(clientId, 0f);

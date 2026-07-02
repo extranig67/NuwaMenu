@@ -60,7 +60,7 @@ private void LoadConfig()
                 activateCompletedCosmicubes = LoadBool("M_ActivateCompletedCosmicubes", false);
                 moreLobbyInfo = Plugin.MoreLobbyInfoConfig.Value;
                 enableChatDarkMode = Plugin.EnableChatDarkModeConfig.Value;
-                ghostChatColorHex = SanitizeHexColor(Plugin.GhostChatColorConfig.Value, "#D7B8FF");
+                ghostChatColorHex = SanitizeGhostChatColorSetting(Plugin.GhostChatColorConfig.Value);
                 throttleDefaultLogs = Plugin.ThrottleDefaultLogsConfig.Value;
                 detailedLogsEnabled = LoadBool("M_DetailedLogsEnabled", Plugin.DetailedLogsEnabledConfig.Value);
                 throttleDefaultLogs = !detailedLogsEnabled;
@@ -80,6 +80,7 @@ private void LoadConfig()
                 autoKickBugs = LoadBool("M_AutoKickBugs", autoKickBugs);
                 if (PlayerPrefs.HasKey("M_AutoKickTimer")) autoKickTimer = PlayerPrefs.GetFloat("M_AutoKickTimer");
                 disableVoteKicks = LoadBool("M_DisableVoteKicks", disableVoteKicks);
+                banVoteKickVoters = LoadBool("M_BanVoteKickVoters", banVoteKickVoters);
                 enableLocalNameSpoof = LoadBool("M_LocalNameSpoof", enableLocalNameSpoof);
                 enableLocalFriendCodeSpoof = LoadBool("M_LocalFakeFCEnabled", enableLocalFriendCodeSpoof);
                 if (PlayerPrefs.HasKey("M_LocalFakeFC")) localFriendCodeInput = PlayerPrefs.GetString("M_LocalFakeFC");
@@ -149,6 +150,8 @@ private void LoadConfig()
                 enableColorCommand = LoadBool("M_EnableColorCommand", enableColorCommand);
                 blockRainbowChat = LoadBool("M_BlockRainbowChat", blockRainbowChat);
                 blockFortegreenChat = LoadBool("M_BlockFortegreenChat", blockFortegreenChat);
+                skipRoleIntroAnim = LoadBool("M_SkipRoleIntroAnim", skipRoleIntroAnim);
+                skipKillAnimation = LoadBool("M_SkipKillAnimation", skipKillAnimation);
                 SpoofMenuEnabled = LoadBool("M_SpoofMenuEnabled", SpoofMenuEnabled);
                 if (PlayerPrefs.HasKey("M_CustomSpoofRpcInput"))
                     customSpoofRpcInput = FilterSpoofRpcInput(PlayerPrefs.GetString("M_CustomSpoofRpcInput", customSpoofRpcInput));
@@ -181,6 +184,7 @@ private void LoadConfig()
                 blockGameRpcInLobby = LoadBool("M_BlockGameRpcInLobby", blockGameRpcInLobby);
                 blockChatFloodRpc = LoadBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 blockMeetingFloodRpc = LoadBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
+                overflowProtection = LoadBool("M_OverflowProtection", LoadBool("M_OverflowDef", overflowProtection));
                 unfixableLights = LoadBool("M_UnfixableLights", unfixableLights);
                 enablePasosLimit = LoadBool("M_PasosLimit", enablePasosLimit);
                 enableLocalPasosBan = LoadBool("M_AntiPasosLocalBan", enableLocalPasosBan);

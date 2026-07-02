@@ -458,6 +458,60 @@ private static int ResolveBestActiveClientId(int clientId)
 		return clientId;
 	}
 
+private static int ResolveStrictActiveSenderClientId(int clientId)
+	{
+		InnerNetClient inner = AmongUsClient.Instance == null ? null : (InnerNetClient)AmongUsClient.Instance;
+		if (IsRemoteClientIdValue(inner, clientId) && IsKnownRemoteClient(clientId))
+		{
+			return clientId;
+		}
+
+		if (!string.IsNullOrWhiteSpace(activeInboundConnectionKey) && !AmbiguousConnectionKeys.Contains(activeInboundConnectionKey))
+		{
+			if (ClientIdByConnectionKey.TryGetValue(activeInboundConnectionKey, out int mappedClientId) &&
+				IsRemoteClientIdValue(inner, mappedClientId) &&
+				IsKnownRemoteClient(mappedClientId))
+			{
+				return mappedClientId;
+			}
+		}
+
+		int activeClientId = GetActiveInboundSenderClientId();
+		if (IsRemoteClientIdValue(inner, activeClientId) && IsKnownRemoteClient(activeClientId))
+		{
+			return activeClientId;
+		}
+
+		return -1;
+	}
+
+private static int ResolveNetIdOverflowSenderClientId(int clientId)
+	{
+		int strictClientId = ResolveStrictActiveSenderClientId(clientId);
+		if (strictClientId >= 0)
+		{
+			return strictClientId;
+		}
+
+		InnerNetClient inner = AmongUsClient.Instance == null ? null : (InnerNetClient)AmongUsClient.Instance;
+		int bestClientId = ResolveBestActiveClientId(clientId);
+		if (IsRemoteClientIdValue(inner, bestClientId) && IsKnownRemoteClient(bestClientId))
+		{
+			return bestClientId;
+		}
+
+		if (inner != null)
+		{
+			int singleClientId = ResolveSingleRemoteClientId(inner);
+			if (IsRemoteClientIdValue(inner, singleClientId) && IsKnownRemoteClient(singleClientId))
+			{
+				return singleClientId;
+			}
+		}
+
+		return -1;
+	}
+
 private static void SetActiveInboundSender(int clientId)
 	{
 		if (clientId < 0 || AmongUsClient.Instance == null)

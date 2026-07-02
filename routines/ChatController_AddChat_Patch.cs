@@ -41,9 +41,11 @@ using Vector3 = UnityEngine.Vector3;
 [HarmonyPatch(typeof(ChatController), nameof(ChatController.AddChat))]
 public static class ChatController_AddChat_Patch
 {
+    [HarmonyPriority(Priority.First)]
     public static bool Prefix(PlayerControl sourcePlayer, ref string chatText, bool censor, ChatController __instance)
     {
         if (string.IsNullOrEmpty(chatText)) return true;
+        ElysiumModMenuGUI.AddPortableChatLog(sourcePlayer, chatText);
         string lowerText = chatText.ToLower().Trim();
 
         if (ElysiumModMenuGUI.enableColorCommand && sourcePlayer != null)
@@ -157,7 +159,7 @@ public static class ChatController_AddChat_Patch
                 chatText = BlockedWords.CensorWords(chatText, false);
             }
 
-            pooledBubble.SetText($"<color={ElysiumModMenuGUI.GetGhostChatColorHex()}>{chatText}</color>");
+            pooledBubble.SetText(ElysiumModMenuGUI.RenderGhostChatMessageText(chatText));
             pooledBubble.AlignChildren();
             chat.AlignAllBubbles();
 

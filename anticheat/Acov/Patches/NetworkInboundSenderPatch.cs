@@ -61,7 +61,10 @@ internal static class NetworkInboundSenderPatch
 {
 	public static void Prefix(InnerNetClient __instance, [HarmonyArgument(0)] DataReceivedEventArgs e)
 	{
-		if (!ElysiumModMenu.ElysiumModMenuGUI.oldAntiCheatVersion) return;
+		if (!ElysiumModMenu.ElysiumModMenuGUI.oldAntiCheatVersion &&
+			!ElysiumModMenu.ElysiumModMenuGUI.banVoteKickVoters &&
+			!(ElysiumModMenu.ElysiumModMenuGUI.overflowProtection && __instance != null && __instance.AmHost))
+			return;
 		using (Acov.AcovProfiler.Sample("Net.TrackSender"))
 			NetworkProtectionGuard.TrackInboundSender(__instance, e);
 	}

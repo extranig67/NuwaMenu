@@ -332,13 +332,13 @@ private void DrawLobbyAllColorSlider()
             Rect sliderRect = new Rect(labelRect.xMax + 7f, row.y, 86f, row.height);
             Rect applyRect = new Rect(row.xMax - 58f, row.y + 2f, 58f, 22f);
 
-            GUI.Label(labelRect, $"{L("Color:", "Р¦РІРµС‚:")} {colorName}", rowLabelStyle);
+            GUI.Label(labelRect, $"{L("Color:", "Цвет:")} {colorName}", rowLabelStyle);
             lobbyAllColorId = DrawCenteredColorSlider(sliderRect, lobbyAllColorId, maxColor);
 
-            if (GUI.Button(applyRect, L("Apply", "РџСЂРёРјРµРЅРёС‚СЊ"), btnStyle))
+            if (GUI.Button(applyRect, L("Apply", "Применить"), btnStyle))
             {
                 ApplyColorToLobby(lobbyAllColorId);
-                ShowNotification($"<color=#00FFAA>[LOBBY]</color> {L("Applied lobby color.", "Р¦РІРµС‚ Р»РѕР±Р±Рё РїСЂРёРјРµРЅРµРЅ.")}");
+                ShowNotification($"<color=#00FFAA>[LOBBY]</color> {L("Applied lobby color.", "Цвет лобби применен.")}");
             }
         }
 
@@ -431,19 +431,19 @@ private void DrawLobbyControls()
 
             GUILayout.BeginVertical(GUILayout.Width(lobbyColumnWidth));
             GUILayout.BeginVertical(menuCardStyle, GUILayout.Width(lobbyColumnWidth), GUILayout.Height(leftTileHeight));
-            DrawMenuSectionHeader(L("GAME RULES", "РџР РђР’РР›Рђ РР“Р Р«"));
+            DrawMenuSectionHeader(L("GAME RULES", "ПРАВИЛА ИГРЫ"));
             GUILayout.FlexibleSpace();
-            neverEndGame = DrawToggle(neverEndGame, L("Unlimited Game", "Р‘РµСЃРєРѕРЅРµС‡РЅР°СЏ РёРіСЂР°"), lobbyControlWidth);
+            neverEndGame = DrawToggle(neverEndGame, L("Unlimited Game", "Бесконечная игра"), lobbyControlWidth);
             GUILayout.Space(5);
-            noSettingLimit = DrawToggle(noSettingLimit, L("No Setting Limit", "Р‘РµР· Р»РёРјРёС‚РѕРІ РЅР°СЃС‚СЂРѕРµРє"), lobbyControlWidth);
+            noSettingLimit = DrawToggle(noSettingLimit, L("No Setting Limit", "Без лимитов настроек"), lobbyControlWidth);
             GUILayout.Space(5);
-            noTaskMode = DrawToggle(noTaskMode, L("No Task Mode", "Р‘РµР· Р·Р°РґР°РЅРёР№"), lobbyControlWidth);
+            noTaskMode = DrawToggle(noTaskMode, L("No Task Mode", "Без заданий"), lobbyControlWidth);
             GUILayout.Space(5);
-            allowDuplicateColors = DrawToggle(allowDuplicateColors, L("Allow Duplicate Colors", "Р Р°Р·СЂРµС€РёС‚СЊ РѕРґРёРЅР°РєРѕРІС‹Рµ С†РІРµС‚Р°"), lobbyControlWidth);
+            allowDuplicateColors = DrawToggle(allowDuplicateColors, L("Allow Duplicate Colors", "Разрешить одинаковые цвета"), lobbyControlWidth);
             GUILayout.Space(5);
 
             bool prevLobbyRainbowAll = lobbyRainbowAll;
-            lobbyRainbowAll = DrawToggle(lobbyRainbowAll, L("Rainbow All", "Р Р°РґСѓРіР° РІСЃРµРј"), lobbyControlWidth);
+            lobbyRainbowAll = DrawToggle(lobbyRainbowAll, L("Rainbow All", "Радуга всем"), lobbyControlWidth);
             if (lobbyRainbowAll && !prevLobbyRainbowAll)
             {
                 lobbyAllColor = false;
@@ -452,7 +452,7 @@ private void DrawLobbyControls()
 
             GUILayout.Space(5);
             bool prevLobbyAllColor = lobbyAllColor;
-            lobbyAllColor = DrawToggle(lobbyAllColor, L("All Color", "Р¦РІРµС‚ РІСЃРµРј"), lobbyControlWidth);
+            lobbyAllColor = DrawToggle(lobbyAllColor, L("All Color", "Цвет всем"), lobbyControlWidth);
             if (lobbyAllColor && !prevLobbyAllColor)
             {
                 lobbyRainbowAll = false;
@@ -469,12 +469,12 @@ private void DrawLobbyControls()
             GUILayout.Space(10);
 
             GUILayout.BeginVertical(menuCardStyle, GUILayout.Width(lobbyColumnWidth), GUILayout.Height(leftTileHeight));
-            DrawMenuSectionHeader(L("LOBBY ACTIONS", "Р”Р•Р™РЎРўР’РРЇ Р›РћР‘Р‘Р"));
+            DrawMenuSectionHeader(L("LOBBY ACTIONS", "ДЕЙСТВИЯ ЛОББИ"));
             GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(L("Spawn Lobby", "РЎРѕР·РґР°С‚СЊ Р»РѕР±Р±Рё"), activeTabStyle, GUILayout.Height(hostActionButtonHeight))) SpawnLobby();
+            if (GUILayout.Button(L("Spawn Lobby", "Создать лобби"), activeTabStyle, GUILayout.Height(hostActionButtonHeight))) SpawnLobby();
             GUILayout.Space(hostActionGap);
-            if (GUILayout.Button(L("Despawn", "РЈРґР°Р»РёС‚СЊ"), btnStyle, GUILayout.Height(hostActionButtonHeight))) DespawnLobby();
+            if (GUILayout.Button(L("Despawn", "Удалить"), btnStyle, GUILayout.Height(hostActionButtonHeight))) DespawnLobby();
             GUILayout.EndHorizontal();
             GUILayout.Space(hostActionGap);
 
@@ -486,11 +486,11 @@ private void DrawLobbyControls()
             GUILayout.Space(hostActionGap);
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(L("Kill All", "РЈР±РёС‚СЊ РІСЃРµС…"), btnStyle, GUILayout.Height(hostActionButtonHeight))) KillAll();
+            if (GUILayout.Button(L("Kill All", "Убить всех"), btnStyle, GUILayout.Height(hostActionButtonHeight))) KillAll();
             GUILayout.Space(hostActionGap);
-            if (GUILayout.Button(L("Kick All", "РљРёРєРЅСѓС‚СЊ РІСЃРµС…"), btnStyle, GUILayout.Height(hostActionButtonHeight))) KickAll();
+            if (GUILayout.Button(L("Kick All", "Кикнуть всех"), btnStyle, GUILayout.Height(hostActionButtonHeight))) KickAll();
             GUILayout.Space(hostActionGap);
-            if (GUILayout.Button(L("Mass Morph", "РњР°СЃСЃ-РјРѕСЂС„"), btnStyle, GUILayout.Height(hostActionButtonHeight))) this.StartCoroutine(MassMorphCoroutine().WrapToIl2Cpp());
+            if (GUILayout.Button(L("Mass Morph", "Масс-морф"), btnStyle, GUILayout.Height(hostActionButtonHeight))) this.StartCoroutine(MassMorphCoroutine().WrapToIl2Cpp());
             GUILayout.EndHorizontal();
             GUILayout.FlexibleSpace();
             GUILayout.EndVertical();
@@ -500,19 +500,19 @@ private void DrawLobbyControls()
 
             GUILayout.BeginVertical(GUILayout.Width(lobbyColumnWidth));
             GUILayout.BeginVertical(menuCardStyle, GUILayout.Width(lobbyColumnWidth), GUILayout.Height(rightTileHeight));
-            DrawMenuSectionHeader(L("CHAT MODERATION", "РњРћР”Р•Р РђР¦РРЇ Р§РђРўРђ"));
+            DrawMenuSectionHeader(L("CHAT MODERATION", "МОДЕРАЦИЯ ЧАТА"));
             GUILayout.FlexibleSpace();
-            enableColorCommand = DrawToggle(enableColorCommand, L("Enable /c command (Public)", "Р Р°Р·СЂРµС€РёС‚СЊ РєРѕРјР°РЅРґСѓ /c"), lobbyControlWidth);
+            enableColorCommand = DrawToggle(enableColorCommand, L("Enable /c command (Public)", "Разрешить команду /c"), lobbyControlWidth);
             GUILayout.Space(5);
-            blockFortegreenChat = DrawToggle(blockFortegreenChat, L("Block Fortegreen Chat", "Р‘Р»РѕРєРёСЂРѕРІР°С‚СЊ С‡Р°С‚ Fortegreen"), lobbyControlWidth);
+            blockFortegreenChat = DrawToggle(blockFortegreenChat, L("Block Fortegreen Chat", "Блокировать чат Fortegreen"), lobbyControlWidth);
             GUILayout.Space(5);
-            blockRainbowChat = DrawToggle(blockRainbowChat, L("Block Rainbow Chat", "Р‘Р»РѕРєРёСЂРѕРІР°С‚СЊ СЂР°РґСѓР¶РЅС‹Р№ С‡Р°С‚"), lobbyControlWidth);
+            blockRainbowChat = DrawToggle(blockRainbowChat, L("Block Rainbow Chat", "Блокировать радужный чат"), lobbyControlWidth);
             GUILayout.Space(5);
-            autoChatEveryone = DrawToggle(autoChatEveryone, L("Chat Everyone (Auto-Meeting)", "Р§Р°С‚ РІСЃРµРј С‡РµСЂРµР· Р°РІС‚Рѕ-РјРёС‚РёРЅРі"), lobbyControlWidth);
+            autoChatEveryone = DrawToggle(autoChatEveryone, L("Chat Everyone (Auto-Meeting)", "Чат всем через авто-митинг"), lobbyControlWidth);
             if (false && autoChatEveryone)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label($"{L("Delay:", "Р—Р°РґРµСЂР¶РєР°:")} {autoChatEveryoneDelay:0.0}s", toggleLabelStyle, GUILayout.Width(92));
+                GUILayout.Label($"{L("Delay:", "Задержка:")} {autoChatEveryoneDelay:0.0}s", toggleLabelStyle, GUILayout.Width(92));
                 autoChatEveryoneDelay = GUILayout.HorizontalSlider(autoChatEveryoneDelay, 0f, 10f, sliderStyle, sliderThumbStyle, GUILayout.Width(170));
                 GUILayout.EndHorizontal();
             }
@@ -522,37 +522,30 @@ private void DrawLobbyControls()
             GUILayout.Space(6);
 
             GUILayout.BeginVertical(menuCardStyle, GUILayout.Width(lobbyColumnWidth), GUILayout.Height(rightTileHeight));
-            DrawMenuSectionHeader(L("END GAME", "РљРћРќР•Р¦ РР“Р Р«"));
+            DrawMenuSectionHeader(L("END GAME", "КОНЕЦ ИГРЫ"));
             GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(L("Crewmate Win", "РџРѕР±РµРґР° СЌРєРёРїР°Р¶Р°"), btnStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("CrewWin");
+            if (GUILayout.Button(L("Crewmate Win", "Победа экипажа"), btnStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("CrewWin");
             GUILayout.Space(hostActionGap);
-            if (GUILayout.Button(L("Impostor Win", "РџРѕР±РµРґР° РїСЂРµРґР°С‚РµР»РµР№"), btnStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("ImpWin");
+            if (GUILayout.Button(L("Impostor Win", "Победа предателей"), btnStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("ImpWin");
             GUILayout.EndHorizontal();
             GUILayout.Space(hostActionGap);
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(L("Imp Disconnect", "Р”РёСЃРєРѕРЅРЅРµРєС‚ РїСЂРµРґР°С‚РµР»СЏ"), btnStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("ImpDisconnect");
+            if (GUILayout.Button(L("Imp Disconnect", "Дисконнект предателя"), btnStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("ImpDisconnect");
             GUILayout.Space(hostActionGap);
-            if (GUILayout.Button(L("H&S Disconnect", "H&S РґРёСЃРєРѕРЅРЅРµРєС‚"), activeTabStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("HnsImpDisconnect");
+            if (GUILayout.Button(L("H&S Disconnect", "H&S дисконнект"), activeTabStyle, GUILayout.Height(hostActionButtonHeight))) SmartEndGame("HnsImpDisconnect");
             GUILayout.EndHorizontal();
             GUILayout.Space(hostActionGap);
 
-            if (GUILayout.Button(L("Force End (Impostor Disconnect)", "Р—Р°РІРµСЂС€РёС‚СЊ РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ"), btnStyle, GUILayout.Height(hostActionButtonHeight)) && GameManager.Instance != null && AmongUsClient.Instance.AmHost)
+            if (GUILayout.Button(L("Force End", "Завершить"), btnStyle, GUILayout.Height(hostActionButtonHeight)) && GameManager.Instance != null && AmongUsClient.Instance.AmHost)
             { bool tempNeverEnd = neverEndGame; neverEndGame = false; GameManager.Instance.RpcEndGame((GameOverReason)4, false); neverEndGame = tempNeverEnd; }
-            GUILayout.FlexibleSpace();
-            GUILayout.EndVertical();
-
-            GUILayout.Space(6);
-
-            GUILayout.BeginVertical(menuCardStyle, GUILayout.Width(lobbyColumnWidth), GUILayout.Height(rightTileHeight));
-            DrawMenuSectionHeader("START / MEETING");
-            GUILayout.FlexibleSpace();
+            GUILayout.Space(hostActionGap);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(L("Insta Start", "РњРіРЅРѕРІРµРЅРЅС‹Р№ СЃС‚Р°СЂС‚"), btnStyle, GUILayout.Height(hostActionButtonHeight)) && GameStartManager.Instance != null)
+            if (GUILayout.Button(L("Insta Start", "Мгновенный старт"), btnStyle, GUILayout.Height(hostActionButtonHeight)) && GameStartManager.Instance != null)
             { GameStartManager.Instance.startState = GameStartManager.StartingStates.Countdown; GameStartManager.Instance.countDownTimer = 0f; }
             GUILayout.Space(hostActionGap);
-            if (GUILayout.Button(L("Close Meeting", "Р—Р°РєСЂС‹С‚СЊ СЃРѕР±СЂР°РЅРёРµ"), btnStyle, GUILayout.Height(hostActionButtonHeight)) && MeetingHud.Instance != null) MeetingHud.Instance.RpcClose();
+            if (GUILayout.Button(L("Close Meeting", "Закрыть собрание"), btnStyle, GUILayout.Height(hostActionButtonHeight)) && MeetingHud.Instance != null) MeetingHud.Instance.RpcClose();
             GUILayout.EndHorizontal();
             GUILayout.FlexibleSpace();
             GUILayout.EndVertical();
@@ -892,16 +885,22 @@ public static void InitializeKillCooldownOnRoundStart()
 [HarmonyPatch(typeof(IntroCutscene), "CoBegin")]
         public static class IntroCutscene_CoBegin_Patch
         {
-            public static void Prefix()
+            public static bool Prefix(IntroCutscene __instance, ref Il2CppSystem.Collections.IEnumerator __result)
             {
-                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
-                if (ElysiumModMenuGUI.enablePreGameRoleForce)
+                if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && ElysiumModMenuGUI.enablePreGameRoleForce)
                 {
                     foreach (var kvp in ElysiumModMenuGUI.forcedPreGameRoles)
                     { var target = GameData.Instance.GetPlayerById(kvp.Key)?.Object; if (target != null && target.Data.RoleType != kvp.Value) target.RpcSetRole(kvp.Value); }
                     foreach (byte impId in ElysiumModMenuGUI.forcedImpostors)
                     { var target = GameData.Instance.GetPlayerById(impId)?.Object; if (target != null && target.Data.Role != null && !target.Data.Role.IsImpostor) target.RpcSetRole(RoleTypes.Impostor); }
                 }
+
+                if (!ElysiumModMenuGUI.skipRoleIntroAnim) return true;
+
+                ElysiumModMenuGUI.TryHideIntroCutscene(__instance);
+                ElysiumModMenuGUI.TryUnlockLocalMovementAfterCutscene();
+                __result = ElysiumModMenuGUI.FastSkipCutsceneCoroutine().WrapToIl2Cpp();
+                return false;
             }
         }
 
@@ -1021,9 +1020,8 @@ public static void InitializeKillCooldownOnRoundStart()
                     List<byte> allForced = ElysiumModMenuGUI.GetForcedImpostorPlayerIds();
                     if (ElysiumModMenuGUI.TryGetForcedHideAndSeekSeekerId(out byte seekerId))
                     {
-                        allForced.Clear();
-                        allForced.Add(seekerId);
-                        ElysiumModMenuGUI.SetHideAndSeekSeekerOption(seekerId);
+                        if (!allForced.Contains(seekerId))
+                            allForced.Insert(0, seekerId);
                     }
 
                     if (allForced.Count > 0) numImps = allForced.Count;
@@ -1032,6 +1030,9 @@ public static void InitializeKillCooldownOnRoundStart()
                         if (numImps >= players.Count) numImps = players.Count - 1;
                         if (numImps < 1) numImps = 1;
                     }
+
+                    if (ElysiumModMenuGUI.TryGetForcedHideAndSeekSeekerId(out byte forcedSeekerId))
+                        ElysiumModMenuGUI.SetHideAndSeekSeekerOption(forcedSeekerId, numImps);
 
                     int assigned = 0;
                     foreach (byte impId in allForced)

@@ -391,7 +391,7 @@ private void DespawnLobby()
         {
             try
             {
-                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                if (!CanMutateLobbyMap("Despawn Lobby")) return;
 
                 int despawned = 0;
                 try
@@ -412,6 +412,8 @@ private void DespawnLobby()
 
                 if (despawned == 0 && LobbyBehaviour.Instance != null)
                     LobbyBehaviour.Instance.Cast<InnerNetObject>().Despawn();
+
+                ResetLobbyMapTransientState();
             }
             catch { }
         }
@@ -420,13 +422,61 @@ private void SpawnLobby()
         {
             try
             {
+                if (!CanMutateLobbyMap("Spawn Lobby")) return;
+
+                if (LobbyBehaviour.Instance != null)
+                {
+                    ShowNotification("<color=#FFAA00>[LOBBY]</color> Lobby is already spawned.");
+                    return;
+                }
+
+                if (ShipStatus.Instance != null)
+                {
+                    ShowNotification("<color=#FFAA00>[LOBBY]</color> Despawn the map before spawning a lobby.");
+                    return;
+                }
+
                 if (GameStartManager.Instance != null && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
                 {
                     LobbyBehaviour newLobby = UnityEngine.Object.Instantiate<LobbyBehaviour>(GameStartManager.Instance.LobbyPrefab);
                     AmongUsClient.Instance.Spawn(newLobby.Cast<InnerNetObject>(), -2, SpawnFlags.None);
+                    ResetLobbyMapTransientState();
                 }
             }
             catch { }
+        }
+
+private static void ResetLobbyMapTransientState()
+        {
+            try { fortegreenTimer.Clear(); } catch { }
+            try { lastKillTimestamps.Clear(); } catch { }
+        }
+
+private static bool CanMutateLobbyMap(string actionName, bool allowActiveMatch = false)
+        {
+            try
+            {
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
+                {
+                    ShowNotification($"<color=#FF0000>[{actionName}]</color> Host only.");
+                    return false;
+                }
+
+                if (MeetingHud.Instance != null || ExileController.Instance != null || IntroCutscene.Instance != null)
+                {
+                    ShowNotification($"<color=#FFAA00>[{actionName}]</color> Blocked during meeting/exile/intro.");
+                    return false;
+                }
+
+                if (!allowActiveMatch && AmongUsClient.Instance.IsGameStarted)
+                {
+                    ShowNotification($"<color=#FFAA00>[{actionName}]</color> Blocked during an active match.");
+                    return false;
+                }
+
+                return true;
+            }
+            catch { return false; }
         }
 
 public static void ChangeNameGlobalHost(PlayerControl target, string newName)
@@ -629,7 +679,7 @@ private void SaveConfig()
                 SaveBool("M_ActivateCompletedCosmicubes", activateCompletedCosmicubes);
                 Plugin.MoreLobbyInfoConfig.Value = moreLobbyInfo;
                 Plugin.EnableChatDarkModeConfig.Value = enableChatDarkMode;
-                Plugin.GhostChatColorConfig.Value = SanitizeHexColor(ghostChatColorHex, "#D7B8FF");
+                Plugin.GhostChatColorConfig.Value = SanitizeGhostChatColorSetting(ghostChatColorHex);
                 Plugin.ThrottleDefaultLogsConfig.Value = throttleDefaultLogs;
                 Plugin.DetailedLogsEnabledConfig.Value = detailedLogsEnabled;
                 Plugin.ShowEspFriendCodeConfig.Value = showEspFriendCode;
@@ -695,6 +745,7 @@ private void SaveConfig()
                 SaveBool("M_AutoKickBugs", autoKickBugs);
                 PlayerPrefs.SetFloat("M_AutoKickTimer", autoKickTimer);
                 SaveBool("M_DisableVoteKicks", disableVoteKicks);
+                SaveBool("M_BanVoteKickVoters", banVoteKickVoters);
                 SaveBool("M_LocalNameSpoof", enableLocalNameSpoof);
                 SaveBool("M_LocalFakeFCEnabled", enableLocalFriendCodeSpoof);
                 PlayerPrefs.SetString("M_LocalFakeFC", localFriendCodeInput);
@@ -731,6 +782,8 @@ private void SaveConfig()
                 SaveBool("M_EnableColorCommand", enableColorCommand);
                 SaveBool("M_BlockRainbowChat", blockRainbowChat);
                 SaveBool("M_BlockFortegreenChat", blockFortegreenChat);
+                SaveBool("M_SkipRoleIntroAnim", skipRoleIntroAnim);
+                SaveBool("M_SkipKillAnimation", skipKillAnimation);
                 SaveBool("M_SpoofMenuEnabled", SpoofMenuEnabled);
                 PlayerPrefs.SetString("M_CustomSpoofRpcInput", customSpoofRpcInput ?? "89");
                 SaveBool("M_NoClip", noClip);
@@ -762,6 +815,7 @@ private void SaveConfig()
                 SaveBool("M_BlockGameRpcInLobby", blockGameRpcInLobby);
                 SaveBool("M_BlockChatFloodRpc", blockChatFloodRpc);
                 SaveBool("M_BlockMeetingFloodRpc", blockMeetingFloodRpc);
+                SaveBool("M_OverflowProtection", overflowProtection);
                 SaveBool("M_UnfixableLights", unfixableLights);
                 SaveBool("M_PasosLimit", enablePasosLimit);
                 SaveBool("M_AntiPasosLocalBan", enableLocalPasosBan);

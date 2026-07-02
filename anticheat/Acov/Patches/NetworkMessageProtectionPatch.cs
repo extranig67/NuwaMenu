@@ -61,7 +61,9 @@ internal static class NetworkMessageProtectionPatch
 {
 	public static bool Prefix(InnerNetClient __instance, MessageReader reader, SendOption sendOption)
 	{
-		if (!ElysiumModMenu.ElysiumModMenuGUI.oldAntiCheatVersion) return true;
+		if (!ElysiumModMenu.ElysiumModMenuGUI.oldAntiCheatVersion &&
+			!(ElysiumModMenu.ElysiumModMenuGUI.overflowProtection && __instance != null && __instance.AmHost))
+			return true;
 		using (Acov.AcovProfiler.Sample("Net.CheckMessage"))
 			return NetworkProtectionGuard.CheckMessage(__instance, reader, sendOption);
 	}

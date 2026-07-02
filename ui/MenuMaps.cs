@@ -85,16 +85,21 @@ namespace ElysiumModMenu
                 if (callId != 26)
                     return true;
 
-                bool shouldBlock = AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && ElysiumModMenuGUI.disableVoteKicks;
+                bool shouldBlock = AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && (ElysiumModMenuGUI.disableVoteKicks || ElysiumModMenuGUI.banVoteKickVoters);
                 try
                 {
                     Hazel.MessageReader copy = Hazel.MessageReader.Get(reader);
+                    int firstClientId = copy.ReadInt32();
                     int targetClientId = copy.ReadInt32();
-                    int voterClientId = copy.ReadInt32();
+                    int voterClientId = Acov.Patches.NetworkProtectionGuard.ResolveCurrentRpcSenderClientId(__instance, callId);
+                    if (voterClientId < 0 && firstClientId != targetClientId && FindVoteClientPlayer(firstClientId) != null)
+                        voterClientId = firstClientId;
                     string targetName = ResolveVoteClientName(targetClientId);
-                    string voterName = ResolveVoteClientName(voterClientId);
+                    string voterName = voterClientId >= 0 ? ResolveVoteClientName(voterClientId) : "unknown voter";
 
                     ShowVoteKickChatInfo(voterName, targetName);
+                    if (ElysiumModMenuGUI.banVoteKickVoters && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+                        BanVoteKickVoter(voterClientId, voterName, targetName);
                     if (shouldBlock)
                         ElysiumModMenuGUI.ShowNotification($"<color=#FFAC1C>[VOTEKICK BLOCK]</color> {voterName} tried to vote-kick {targetName}");
                 }
@@ -105,6 +110,50 @@ namespace ElysiumModMenu
                 }
 
                 return !shouldBlock;
+            }
+
+            internal static void BanVoteKickVoter(int voterClientId, string voterName, string targetName)
+            {
+                try
+                {
+                    if (AmongUsClient.Instance == null || voterClientId < 0 || voterClientId == AmongUsClient.Instance.ClientId)
+                        return;
+
+                    PlayerControl voter = FindVoteClientPlayer(voterClientId);
+                    string cleanName = voter != null && voter.Data != null && !string.IsNullOrWhiteSpace(voter.Data.PlayerName)
+                        ? voter.Data.PlayerName
+                        : CleanVoteName(voterName);
+                    string friendCode = voter != null && voter.Data != null
+                        ? GetDisplayedFriendCode(voter.Data, string.Empty)
+                        : string.Empty;
+                    string puid = voter != null ? GetPlayerPuid(voter) : "Unknown";
+
+                    AddToBanList(string.IsNullOrWhiteSpace(friendCode) ? $"Client:{voterClientId}" : friendCode,
+                        string.IsNullOrWhiteSpace(puid) ? "Unknown" : puid,
+                        string.IsNullOrWhiteSpace(cleanName) ? $"client {voterClientId}" : cleanName,
+                        $"Vote-kick attempt: {CleanVoteName(targetName)}");
+
+                    AmongUsClient.Instance.KickPlayer(voterClientId, true);
+                    ElysiumModMenuGUI.ShowNotification($"<color=#FF4444>[VOTE BAN]</color> {CleanVoteName(voterName)} banned for vote-kick.");
+                }
+                catch { }
+            }
+
+            private static PlayerControl FindVoteClientPlayer(int clientId)
+            {
+                try
+                {
+                    if (PlayerControl.AllPlayerControls == null) return null;
+                    foreach (var pc in PlayerControl.AllPlayerControls)
+                    {
+                        if (pc == null || pc.Data == null) continue;
+                        if (pc.Data.ClientId == clientId || (int)pc.OwnerId == clientId)
+                            return pc;
+                    }
+                }
+                catch { }
+
+                return null;
             }
 
             private static string ResolveVoteClientName(int clientId)
@@ -155,6 +204,8 @@ namespace ElysiumModMenu
 
 public static bool disableVoteKicks = false;
 
+public static bool banVoteKickVoters = false;
+
 [HarmonyPatch(typeof(ShhhBehaviour), nameof(ShhhBehaviour.PlayAnimation))]
         public static class SkipShhh_Perfect_Patch
         {
@@ -173,12 +224,131 @@ public static bool disableVoteKicks = false;
             private static System.Collections.IEnumerator FastSkip() { yield break; }
         }
 
+[HarmonyPatch(typeof(IntroCutscene), "ShowRole")]
+        public static class IntroCutscene_ShowRole_Skip_Patch
+        {
+            public static bool Prefix(IntroCutscene __instance, ref Il2CppSystem.Collections.IEnumerator __result)
+            {
+                if (!ElysiumModMenuGUI.skipRoleIntroAnim) return true;
+
+                ElysiumModMenuGUI.TryHideIntroCutscene(__instance);
+                ElysiumModMenuGUI.TryUnlockLocalMovementAfterCutscene();
+                __result = ElysiumModMenuGUI.FastSkipCutsceneCoroutine().WrapToIl2Cpp();
+                return false;
+            }
+        }
+
+[HarmonyPatch]
+        public static class KillOverlay_ShowKillAnimation_Skip_Patch
+        {
+            public static IEnumerable<MethodBase> TargetMethods()
+            {
+                MethodInfo basic = AccessTools.Method(typeof(KillOverlay), nameof(KillOverlay.ShowKillAnimation), new[] { typeof(NetworkedPlayerInfo), typeof(NetworkedPlayerInfo) });
+                if (basic != null) yield return basic;
+
+                MethodInfo withAnimation = AccessTools.Method(typeof(KillOverlay), nameof(KillOverlay.ShowKillAnimation), new[] { typeof(OverlayKillAnimation), typeof(NetworkedPlayerInfo), typeof(NetworkedPlayerInfo) });
+                if (withAnimation != null) yield return withAnimation;
+
+                MethodInfo withInitData = AccessTools.Method(typeof(KillOverlay), nameof(KillOverlay.ShowKillAnimation), new[] { typeof(OverlayKillAnimation), typeof(KillOverlayInitData) });
+                if (withInitData != null) yield return withInitData;
+            }
+
+            public static bool Prefix(KillOverlay __instance)
+            {
+                if (!ElysiumModMenuGUI.skipKillAnimation) return true;
+
+                ElysiumModMenuGUI.TryHideKillOverlay(__instance);
+                ElysiumModMenuGUI.TryUnlockLocalMovementAfterCutscene();
+                return false;
+            }
+        }
+
+[HarmonyPatch(typeof(KillOverlay), nameof(KillOverlay.ShowAll))]
+        public static class KillOverlay_ShowAll_Skip_Patch
+        {
+            public static bool Prefix(KillOverlay __instance, ref Il2CppSystem.Collections.IEnumerator __result)
+            {
+                if (!ElysiumModMenuGUI.skipKillAnimation) return true;
+
+                ElysiumModMenuGUI.TryHideKillOverlay(__instance);
+                ElysiumModMenuGUI.TryUnlockLocalMovementAfterCutscene();
+                __result = ElysiumModMenuGUI.FastSkipCutsceneCoroutine().WrapToIl2Cpp();
+                return false;
+            }
+        }
+
+private static System.Collections.IEnumerator FastSkipCutsceneCoroutine()
+        {
+            yield break;
+        }
+
+private static void TryHideIntroCutscene(IntroCutscene intro)
+        {
+            try
+            {
+                if (intro != null && intro.gameObject != null)
+                    intro.gameObject.SetActive(false);
+            }
+            catch { }
+        }
+
+private static void TryHideKillOverlay(KillOverlay overlay)
+        {
+            try
+            {
+                if (overlay == null) return;
+
+                overlay.StopAllCoroutines();
+
+                if (overlay.gameObject != null && overlay.gameObject.activeSelf)
+                {
+                    overlay.gameObject.SetActive(false);
+                    overlay.gameObject.SetActive(true);
+                }
+            }
+            catch { }
+        }
+
+private static void TryUnlockLocalMovementAfterCutscene()
+        {
+            try
+            {
+                PlayerControl local = PlayerControl.LocalPlayer;
+                if (local == null) return;
+
+                local.moveable = true;
+
+                if (local.Collider != null)
+                    local.Collider.enabled = true;
+
+                if (local.MyPhysics != null && local.MyPhysics.gameObject != null)
+                    local.MyPhysics.gameObject.layer = LayerMask.NameToLayer("Players");
+            }
+            catch { }
+        }
+
 private void SpawnMap(int mapId)
         {
             try
             {
+                if (!CanMutateLobbyMap("Spawn Map", true)) return;
                 if ((UnityEngine.Object)(object)AmongUsClient.Instance == (UnityEngine.Object)null || AmongUsClient.Instance.ShipPrefabs == null)
                     return;
+                if (manualMapSpawnInProgress)
+                {
+                    ShowNotification("<color=#FFAA00>[MAP]</color> Map spawn is already running.");
+                    return;
+                }
+                if (ShipStatus.Instance != null)
+                {
+                    ShowNotification("<color=#FFAA00>[MAP]</color> Despawn the current map first.");
+                    return;
+                }
+                if (LobbyBehaviour.Instance != null)
+                {
+                    ShowNotification("<color=#FFAA00>[MAP]</color> Despawn the lobby before spawning a map.");
+                    return;
+                }
 
                 int realMapId = mapId;
                 if (mapId == 3) realMapId = 4;
@@ -195,11 +365,22 @@ private void SpawnMap(int mapId)
 [HideFromIl2Cpp]
         private System.Collections.IEnumerator CoSpawnMap(int mapId)
         {
-            AmongUsClient.Instance.ShipLoadingAsyncHandle = AmongUsClient.Instance.ShipPrefabs[mapId].InstantiateAsync((Transform)null, false);
-            yield return AmongUsClient.Instance.ShipLoadingAsyncHandle;
+            manualMapSpawnInProgress = true;
+            try
+            {
+                AmongUsClient.Instance.ShipLoadingAsyncHandle = AmongUsClient.Instance.ShipPrefabs[mapId].InstantiateAsync((Transform)null, false);
+                yield return AmongUsClient.Instance.ShipLoadingAsyncHandle;
 
-            ShipStatus.Instance = AmongUsClient.Instance.ShipLoadingAsyncHandle.Result.GetComponent<ShipStatus>();
-            ((InnerNetClient)AmongUsClient.Instance).Spawn(((Component)ShipStatus.Instance).GetComponent<InnerNetObject>(), -2, (SpawnFlags)0);
+                ShipStatus.Instance = AmongUsClient.Instance.ShipLoadingAsyncHandle.Result.GetComponent<ShipStatus>();
+                ((InnerNetClient)AmongUsClient.Instance).Spawn(((Component)ShipStatus.Instance).GetComponent<InnerNetObject>(), -2, (SpawnFlags)0);
+                manualSpawnedMapId = NormalizeRuntimeMapId(mapId);
+                ResetLobbyMapTransientState();
+            }
+            finally
+            {
+                manualMapSpawnInProgress = false;
+                try { AmongUsClient.Instance.ShipLoadingAsyncHandle = default; } catch { }
+            }
 
         }
 
@@ -207,9 +388,13 @@ private void DespawnMap()
         {
             try
             {
+                if (!CanMutateLobbyMap("Despawn Map", true)) return;
                 if (ShipStatus.Instance != null)
                 {
                     ShipStatus.Instance.Despawn();
+                    ShipStatus.Instance = null;
+                    manualSpawnedMapId = -1;
+                    ResetLobbyMapTransientState();
                 }
             }
             catch { }
@@ -295,22 +480,78 @@ public static Dictionary<string, Vector2> fungleTeleportLocations = new Dictiona
 
 public static int GetCurrentMapId()
         {
+            if (TryGetLiveShipMapId(out int liveMapId))
+                return liveMapId;
+
+            if (manualSpawnedMapId >= 0)
+                return manualSpawnedMapId;
+
             if (AmongUsClient.Instance == null) return 0;
             if (AmongUsClient.Instance.NetworkMode == NetworkModes.FreePlay)
             {
-                return AmongUsClient.Instance.TutorialMapId;
+                return NormalizeRuntimeMapId(AmongUsClient.Instance.TutorialMapId);
             }
             else
             {
                 if (GameOptionsManager.Instance == null || GameOptionsManager.Instance.CurrentGameOptions == null) return 0;
-                return GameOptionsManager.Instance.CurrentGameOptions.MapId;
+                return NormalizeRuntimeMapId(GameOptionsManager.Instance.CurrentGameOptions.MapId);
             }
+        }
+
+private static bool TryGetLiveShipMapId(out int mapId)
+        {
+            mapId = -1;
+
+            try
+            {
+                ShipStatus ship = ShipStatus.Instance;
+                if (ship == null) return false;
+
+                string typeName = ship.GetType().Name ?? string.Empty;
+                string objectName = string.Empty;
+                try { objectName = ((Component)ship).gameObject.name ?? string.Empty; } catch { }
+                string marker = (typeName + " " + objectName).ToLowerInvariant();
+
+                if (marker.Contains("fungle")) { mapId = 5; return true; }
+                if (marker.Contains("airship")) { mapId = 4; return true; }
+                if (marker.Contains("polus")) { mapId = 2; return true; }
+                if (marker.Contains("mira")) { mapId = 1; return true; }
+                if (marker.Contains("skeld")) { mapId = 0; return true; }
+
+                switch (ship.Type)
+                {
+                    case ShipStatus.MapType.Hq:
+                        mapId = 1;
+                        return true;
+                    case ShipStatus.MapType.Pb:
+                        mapId = 2;
+                        return true;
+                    case ShipStatus.MapType.Fungle:
+                        mapId = 5;
+                        return true;
+                    case ShipStatus.MapType.Ship:
+                        mapId = 0;
+                        return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+private static int NormalizeRuntimeMapId(int mapId)
+        {
+            if (mapId == 3) return 0;
+            return mapId;
         }
 
 private Vector2 mapsScrollPos = Vector2.zero;
 
 public static Dictionary<string, Vector2> GetTeleportLocations()
         {
+            if (TryBuildLiveRoomTeleportLocations(out Dictionary<string, Vector2> liveLocations))
+                return liveLocations;
+
             switch (GetCurrentMapId())
             {
                 case 0: return skeldTeleportLocations;
@@ -320,6 +561,213 @@ public static Dictionary<string, Vector2> GetTeleportLocations()
                 case 4: return airshipTeleportLocations;
                 case 5: return fungleTeleportLocations;
                 default: return skeldTeleportLocations;
+            }
+        }
+
+private static bool TryBuildLiveRoomTeleportLocations(out Dictionary<string, Vector2> locations)
+        {
+            locations = new Dictionary<string, Vector2>();
+
+            try
+            {
+                ShipStatus ship = ShipStatus.Instance;
+                if (ship == null || ship.AllRooms == null) return false;
+
+                foreach (PlainShipRoom room in ship.AllRooms)
+                {
+                    if (room == null || room.roomArea == null) continue;
+
+                    Bounds bounds = room.roomArea.bounds;
+                    if (bounds.size.sqrMagnitude < 0.01f) continue;
+
+                    string label = GetRoomTeleportLabel(room.RoomId);
+                    if (string.IsNullOrWhiteSpace(label)) continue;
+
+                    Vector2 position = ResolveRoomTeleportPosition(label, bounds);
+                    AddUniqueTeleportLocation(locations, label, position);
+                }
+            }
+            catch
+            {
+                locations.Clear();
+                return false;
+            }
+
+            return locations.Count > 0;
+        }
+
+private static Vector2 ResolveRoomTeleportPosition(string label, Bounds bounds)
+        {
+            Vector2 center = new Vector2(bounds.center.x, bounds.center.y);
+
+            try
+            {
+                if (TryGetStaticRoomTeleportPosition(label, out Vector2 staticPosition) && IsSafeRoomTeleportPoint(staticPosition))
+                    return staticPosition;
+
+                Vector2 safePosition = FindSafeRoomTeleportPoint(bounds, center);
+                if (IsSafeRoomTeleportPoint(safePosition))
+                    return safePosition;
+            }
+            catch { }
+
+            return center;
+        }
+
+private static bool TryGetStaticRoomTeleportPosition(string label, out Vector2 position)
+        {
+            position = default;
+
+            try
+            {
+                Dictionary<string, Vector2> staticLocations = null;
+                switch (GetCurrentMapId())
+                {
+                    case 0:
+                    case 3:
+                        staticLocations = skeldTeleportLocations;
+                        break;
+                    case 1:
+                        staticLocations = miraTeleportLocations;
+                        break;
+                    case 2:
+                        staticLocations = polusTeleportLocations;
+                        break;
+                    case 4:
+                        staticLocations = airshipTeleportLocations;
+                        break;
+                    case 5:
+                        staticLocations = fungleTeleportLocations;
+                        break;
+                }
+
+                return staticLocations != null && staticLocations.TryGetValue(label, out position);
+            }
+            catch
+            {
+                position = default;
+                return false;
+            }
+        }
+
+private static Vector2 FindSafeRoomTeleportPoint(Bounds bounds, Vector2 center)
+        {
+            const float margin = 0.45f;
+
+            if (IsSafeRoomTeleportPoint(center))
+                return center;
+
+            float xLimit = Mathf.Max(0f, bounds.extents.x - margin);
+            float yLimit = Mathf.Max(0f, bounds.extents.y - margin);
+            float[] distances = { 0.65f, 1.1f, 1.65f, 2.25f, 3.0f };
+
+            Vector2 bestFallback = center;
+            float bestFallbackScore = float.MaxValue;
+
+            foreach (float distance in distances)
+            {
+                Vector2[] offsets =
+                {
+                    new Vector2(0f, distance),
+                    new Vector2(distance, 0f),
+                    new Vector2(0f, -distance),
+                    new Vector2(-distance, 0f),
+                    new Vector2(distance * 0.7f, distance * 0.7f),
+                    new Vector2(distance * 0.7f, -distance * 0.7f),
+                    new Vector2(-distance * 0.7f, distance * 0.7f),
+                    new Vector2(-distance * 0.7f, -distance * 0.7f)
+                };
+
+                foreach (Vector2 offset in offsets)
+                {
+                    Vector2 candidate = new Vector2(
+                        center.x + Mathf.Clamp(offset.x, -xLimit, xLimit),
+                        center.y + Mathf.Clamp(offset.y, -yLimit, yLimit));
+
+                    float score = (candidate - center).sqrMagnitude;
+                    if (score < bestFallbackScore)
+                    {
+                        bestFallback = candidate;
+                        bestFallbackScore = score;
+                    }
+
+                    if (IsSafeRoomTeleportPoint(candidate))
+                        return candidate;
+                }
+            }
+
+            return bestFallback;
+        }
+
+private static bool IsSafeRoomTeleportPoint(Vector2 position)
+        {
+            try
+            {
+                Collider2D[] hits = Physics2D.OverlapCircleAll(position, 0.32f, Constants.ShipOnlyMask);
+                if (hits == null) return true;
+
+                Collider2D localCollider = null;
+                try { localCollider = PlayerControl.LocalPlayer?.Collider; } catch { }
+
+                foreach (Collider2D hit in hits)
+                {
+                    if (hit == null || hit.isTrigger || hit == localCollider) continue;
+                    return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+private static void AddUniqueTeleportLocation(Dictionary<string, Vector2> locations, string label, Vector2 position)
+        {
+            if (!locations.ContainsKey(label))
+            {
+                locations[label] = position;
+                return;
+            }
+
+            int index = 2;
+            string key;
+            do
+            {
+                key = $"{label} {index}";
+                index++;
+            }
+            while (locations.ContainsKey(key));
+
+            locations[key] = position;
+        }
+
+private static string GetRoomTeleportLabel(SystemTypes room)
+        {
+            switch (room)
+            {
+                case SystemTypes.LifeSupp: return "O2";
+                case SystemTypes.Nav: return "Navigation";
+                case SystemTypes.Comms: return "Communications";
+                case SystemTypes.MedBay: return "Medbay";
+                case SystemTypes.UpperEngine: return "Upper Engine";
+                case SystemTypes.LowerEngine: return "Lower Engine";
+                case SystemTypes.LockerRoom: return "Locker Room";
+                case SystemTypes.Specimens: return "Specimen Room";
+                case SystemTypes.VaultRoom: return "Vault";
+                case SystemTypes.ViewingDeck: return "Viewing Deck";
+                case SystemTypes.HallOfPortraits: return "Hall of Portraits";
+                case SystemTypes.CargoBay: return "Cargo Bay";
+                case SystemTypes.GapRoom: return "Gap Room";
+                case SystemTypes.MainHall: return "Main Hall";
+                case SystemTypes.MeetingRoom: return "Meeting Room";
+                case SystemTypes.RecRoom: return "Rec Room";
+                case SystemTypes.FishingDock: return "Fishing Dock";
+                case SystemTypes.SleepingQuarters: return "Sleeping Quarters";
+                case SystemTypes.Decontamination2: return "Decontamination 2";
+                case SystemTypes.Decontamination3: return "Decontamination 3";
+                default: return room.ToString();
             }
         }
 

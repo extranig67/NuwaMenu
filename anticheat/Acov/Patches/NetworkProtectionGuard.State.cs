@@ -265,6 +265,10 @@ private static readonly Dictionary<string, float> HostRateDropByKey = new Dictio
 
 private static readonly Dictionary<string, int> HostDatagramsThisFrameByKey = new Dictionary<string, int>();
 
+private static readonly Dictionary<int, float> NetIdOverflowActionUntilByClient = new Dictionary<int, float>();
+
+private static readonly Dictionary<string, float> NetIdOverflowActionUntilByConnection = new Dictionary<string, float>();
+
 private static int hostDatagramFrame = -1;
 
 private static readonly Dictionary<string, FloodAttributionState> FloodAttributionByKey = new Dictionary<string, FloodAttributionState>();
@@ -318,6 +322,8 @@ private static int nonHostDatagramsThisFrame = 0;
 
 private const int NonHostFloodDatagramThreshold = 50;
 
+private const float NetIdOverflowActionCooldownSeconds = 30f;
+
 private static int lastRememberedClientsFrame = -1;
 
 private static float lastScreenNoticeAt = -10f;
@@ -356,6 +362,10 @@ private static bool activeInboundHasDataFlood;
 
 private static string activeInboundDataFloodDetail;
 
+private static bool activeInboundHasNetIdOverflow;
+
+private static string activeInboundNetIdOverflowDetail;
+
 private static bool activeInboundPhantomFlood;
 
 private static bool activeInboundHasPhantomNetId;
@@ -391,7 +401,9 @@ internal static void TrackInboundSender(InnerNetClient client, DataReceivedEvent
 				AcovNetPacketMonitor.RecordInboundPacket(-1, eventArgs.Message);
 			}
 
-			if (!Enabled() || client == null || !client.AmHost || eventArgs == null)
+			bool voteKickSenderTracking = ElysiumModMenu.ElysiumModMenuGUI.banVoteKickVoters && client != null && client.AmHost;
+			bool overflowSenderTracking = NetIdOverflowProtectionEnabled() && client != null && client.AmHost;
+			if ((!Enabled() && !voteKickSenderTracking && !overflowSenderTracking) || client == null || !client.AmHost || eventArgs == null)
 			{
 				if (EnabledNonHostFloodDrop() && client != null && !client.AmHost)
 				{
@@ -492,6 +504,31 @@ internal static bool CheckMessage(InnerNetClient client, MessageReader reader, S
 	{
 		if (!Enabled())
 		{
+			if (NetIdOverflowProtectionEnabled() && client != null && client.AmHost)
+			{
+				try
+				{
+					if (reader != null && (reader.Tag == 5 || reader.Tag == 6))
+					{
+						ResetInboundEnvelope(sendOption);
+						if (reader.Length - reader.Position >= 4 && GameDataFramingValid(reader, reader.Tag))
+						{
+							CaptureGameDataEnvelope(reader, reader.Tag, sendOption);
+							if (activeInboundHasNetIdOverflow)
+							{
+								int overflowSenderClientId = ResolveNetIdOverflowSenderClientId(GetActiveInboundSenderClientId());
+								if (overflowSenderClientId >= 0) RegisterInboundFloodDrop(overflowSenderClientId);
+								BlockNetIdOverflow(overflowSenderClientId, activeInboundNetIdOverflowDetail ?? "Client sent netId 0 GameData.");
+								return HarmonyControl.SkipOriginal;
+							}
+						}
+					}
+				}
+				catch { }
+
+				return HarmonyControl.Continue;
+			}
+
 			if (client != null && reader != null && !ValidMessageTags.Contains(reader.Tag))
 			{
 				return HarmonyControl.SkipOriginal;
@@ -777,6 +814,14 @@ internal static bool CheckMessage(InnerNetClient client, MessageReader reader, S
 					return HarmonyControl.SkipOriginal;
 				}
 
+				if (NetIdOverflowProtectionEnabled() && activeInboundHasNetIdOverflow)
+				{
+					int overflowSenderClientId = ResolveNetIdOverflowSenderClientId(GetActiveInboundSenderClientId());
+					if (overflowSenderClientId >= 0) RegisterInboundFloodDrop(overflowSenderClientId);
+					BlockNetIdOverflow(overflowSenderClientId, activeInboundNetIdOverflowDetail ?? "Client sent netId 0 GameData.");
+					return HarmonyControl.SkipOriginal;
+				}
+
 				if (activeInboundHasPhantomNetId && activeInboundPhantomFlood)
 				{
 					if (senderClientId >= 0) RegisterInboundFloodDrop(senderClientId);
@@ -1012,6 +1057,26 @@ private static void PruneFloodDrops()
 		}
 		for (int i = 0; i < ScratchConnectionKeys.Count; i++)
 			HostRateDropByKey.Remove(ScratchConnectionKeys[i]);
+
+		ScratchClientSnapshotIds.Clear();
+		foreach (KeyValuePair<int, float> pair in NetIdOverflowActionUntilByClient)
+		{
+			if (now > pair.Value)
+			{
+				ScratchClientSnapshotIds.Add(pair.Key);
+			}
+		}
+		for (int i = 0; i < ScratchClientSnapshotIds.Count; i++)
+			NetIdOverflowActionUntilByClient.Remove(ScratchClientSnapshotIds[i]);
+
+		ScratchConnectionKeys.Clear();
+		foreach (KeyValuePair<string, float> pair in NetIdOverflowActionUntilByConnection)
+		{
+			if (string.IsNullOrWhiteSpace(pair.Key) || now > pair.Value)
+				ScratchConnectionKeys.Add(pair.Key);
+		}
+		for (int i = 0; i < ScratchConnectionKeys.Count; i++)
+			NetIdOverflowActionUntilByConnection.Remove(ScratchConnectionKeys[i]);
 
 		ScratchConnectionKeys.Clear();
 		foreach (KeyValuePair<string, FloodAttributionState> pair in FloodAttributionByKey)

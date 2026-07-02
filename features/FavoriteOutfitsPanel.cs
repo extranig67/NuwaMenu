@@ -47,6 +47,7 @@ public void Update()
         {
             TickNotificationQueue();
             TickFakeStartCounter();
+            TickAutoTwoImpostors();
             MoreLobbyInfo_GameContainer_SetupGameInfo_Postfix.UpdateStyledNames();
 
             bool isTypingOrBinding = isEditingName || isEditingLevel || isEditingFriendCode || isEditingLocalFriendCode || isEditingGhostChatColor || isEditingBan || customChatInputFocused ||
@@ -206,17 +207,14 @@ public void Update()
                 }
 
 
-                if ((tpToCursor && Input.GetMouseButtonDown(1)) ||
-                    (dragToCursor && Input.GetMouseButton(2)) ||
-                    autoFollowCursor)
-                {
-                    if (Camera.main != null)
-                    {
-                        Vector3 mPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-                        mPos.z = PlayerControl.LocalPlayer.transform.position.z;
-                        PlayerControl.LocalPlayer.NetTransform.RpcSnapTo(mPos);
-                    }
-                }
+                bool cursorTeleportClick = tpToCursor && Input.GetMouseButtonDown(1);
+                bool cursorDragHeld = dragToCursor && Input.GetMouseButton(2);
+                if (cursorTeleportClick)
+                    MoveLocalPlayerToCursor(true);
+                else if (cursorDragHeld || autoFollowCursor)
+                    MoveLocalPlayerToCursor(false);
+                else
+                    ResetCursorMoveRpcThrottle();
                 try
                 {
                     if (noTaskMode && AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
@@ -322,6 +320,13 @@ public void Update()
                             AmongUsClient.Instance.LateBroadcastUnreliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
                         }
 
+                        if (AnimEmptyGarbageEnabled)
+                        {
+                            PlayerControl.LocalPlayer.PlayAnimation((byte)TaskTypes.EmptyGarbage);
+                            RpcPlayAnimationMessage rpcMessage = new(PlayerControl.LocalPlayer.NetId, (byte)TaskTypes.EmptyGarbage);
+                            AmongUsClient.Instance.LateBroadcastUnreliableMessage(Unsafe.As<IGameDataMessage>(rpcMessage));
+                        }
+
                         if (IsScanning && !isScannerActiveFlag)
                         {
                             var count = ++PlayerControl.LocalPlayer.scannerCount;
@@ -397,6 +402,8 @@ public void Update()
                             string fc = GetDisplayedFriendCode(pc.Data, string.Empty);
                             if (IsFriendCodeBanned(fc))
                             {
+                                string name = string.IsNullOrWhiteSpace(pc.Data.PlayerName) ? $"Player {pc.PlayerId}" : pc.Data.PlayerName;
+                                RegisterAntiCheatDisconnectNotice(pc.OwnerId, name, "Ban list match", true);
                                 AmongUsClient.Instance.KickPlayer(pc.OwnerId, true);
                             }
                         }
@@ -424,8 +431,8 @@ public void Update()
                             string botPuid = hasIdentity ? identity.Puid : "Unknown";
 
                             AddToBotBanList(banFc, botPuid, string.IsNullOrEmpty(botName) ? "Unknown" : botName, "Bot nickname");
+                            RegisterAntiCheatDisconnectNotice(pc.OwnerId, string.IsNullOrEmpty(botName) ? "Unknown" : botName, "Bot nickname", true);
                             AmongUsClient.Instance.KickPlayer(pc.OwnerId, true);
-                            ShowNotification($"<color=#FF0000>[BAN BOTS]</color> {(string.IsNullOrEmpty(botName) ? "Unknown" : botName)} кикнут (бот).");
                         }
                     }
                     else if (!banBotsEnabled)
@@ -560,6 +567,54 @@ public void Update()
 
 
             }
+        }
+
+private static void ResetCursorMoveRpcThrottle()
+        {
+            hasLastCursorMoveRpcPosition = false;
+            nextCursorMoveRpcAt = 0f;
+        }
+
+private static void MoveLocalPlayerToCursor(bool forceRpc)
+        {
+            try
+            {
+                PlayerControl local = PlayerControl.LocalPlayer;
+                if (local == null || local.NetTransform == null || Camera.main == null) return;
+
+                Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                Vector2 target = new Vector2(mouseWorld.x, mouseWorld.y);
+
+                try { local.NetTransform.SnapTo(target); } catch { }
+
+                if (!forceRpc && !ShouldSendCursorMoveRpc(target))
+                    return;
+
+                local.NetTransform.RpcSnapTo(target);
+                lastCursorMoveRpcPosition = target;
+                hasLastCursorMoveRpcPosition = true;
+                nextCursorMoveRpcAt = Time.unscaledTime + CursorMoveRpcIntervalSeconds;
+            }
+            catch { }
+        }
+
+private static bool ShouldSendCursorMoveRpc(Vector2 target)
+        {
+            try
+            {
+                if (AmongUsClient.Instance == null || AmongUsClient.Instance.NetworkMode == NetworkModes.FreePlay)
+                    return false;
+
+                if (Time.unscaledTime < nextCursorMoveRpcAt)
+                    return false;
+
+                if (hasLastCursorMoveRpcPosition &&
+                    (target - lastCursorMoveRpcPosition).sqrMagnitude < CursorMoveRpcMinDistance * CursorMoveRpcMinDistance)
+                    return false;
+
+                return true;
+            }
+            catch { return false; }
         }
 
         private static void TickFakeStartCounter()
@@ -890,12 +945,7 @@ private static void SendSpoofMenuRpc(byte rpc)
                     return;
                 }
 
-                List<int> targetClientIds = GetRemoteSpoofRpcTargets(client);
                 SendSpoofRpcToTarget(client, local, rpc, -1);
-                for (int i = 0; i < targetClientIds.Count; i++)
-                {
-                    SendSpoofRpcToTarget(client, local, rpc, targetClientIds[i]);
-                }
             }
             catch (Exception error)
             {
@@ -910,32 +960,6 @@ private static void SendSpoofRpcToTarget(AmongUsClient client, PlayerControl loc
                 throw new InvalidOperationException($"StartRpcImmediately returned null for target {targetClientId}");
 
             client.FinishRpcImmediately(msg);
-        }
-
-private static List<int> GetRemoteSpoofRpcTargets(AmongUsClient client)
-        {
-            List<int> targets = new List<int>();
-            try
-            {
-                InnerNetClient inner = (InnerNetClient)client;
-                if (inner == null || inner.allClients == null)
-                    return targets;
-
-                var cursor = inner.allClients.GetEnumerator();
-                while (cursor.MoveNext())
-                {
-                    ClientData data = cursor.Current;
-                    if (data == null || data.Id < 0 || data.Id == client.ClientId)
-                        continue;
-                    if (IsAutoChatClientDisconnected(data))
-                        continue;
-                    if (!targets.Contains(data.Id))
-                        targets.Add(data.Id);
-                }
-            }
-            catch { }
-
-            return targets;
         }
 
 private static void LogFakeRpcFailure(byte rpc, string reason)
@@ -989,9 +1013,9 @@ public static readonly Dictionary<string, string[]> colorNamesByLang = new Dicti
             ["fi"] = new string[] { "Punainen", "Sininen", "Vihreä", "Pinkki", "Oranssi", "Keltainen", "Musta", "Valkoinen", "Violetti", "Ruskea", "Syaani", "Limetti", "Viininpunainen", "Ruusu", "Banaani", "Harmaa", "Beige", "Koralli" },
             ["no"] = new string[] { "Rød", "Blå", "Grønn", "Rosa", "Oransje", "Gul", "Svart", "Hvit", "Lilla", "Brun", "Cyan", "Lime", "Vinrød", "Rosenrød", "Banan", "Grå", "Beige", "Korall" },
             ["el"] = new string[] { "Κόκκινο", "Μπλε", "Πράσινο", "Ροζ", "Πορτοκαλί", "Κίτρινο", "Μαύρο", "Λευκό", "Μωβ", "Καφέ", "Κυανό", "Λάιμ", "Βυσσινί", "Τριανταφυλλί", "Μπανάνα", "Γκρι", "Μπεζ", "Κοράλι" },
-            ["zh"] = new string[] { "红色", "蓝色", "绿色", "粉色", "橙色", "黄色", "黑色", "白色", "紫色", "棕色", "青色", "青柠", "栗色", "玫瑰色", "香蕉色", "灰���", "棕褐色", "珊瑚色" },
+            ["zh"] = new string[] { "红色", "蓝色", "绿色", "粉色", "橙色", "黄色", "黑色", "白色", "紫色", "棕色", "青色", "青柠", "栗色", "玫瑰色", "香蕉色", "灰色", "棕褐色", "珊瑚色" },
             ["ja"] = new string[] { "赤", "青", "緑", "ピンク", "オレンジ", "黄", "黒", "白", "紫", "茶", "シアン", "ライム", "マルーン", "ローズ", "バナナ", "グレー", "タン", "コーラル" },
-            ["ko"] = new string[] { "빨강", "파랑", "초록", "분홍", "주황", "노���", "검정", "흰색", "보라", "갈색", "청록", "라임", "적갈색", "장미", "바나나", "회색", "황갈색", "산호색" }
+            ["ko"] = new string[] { "빨강", "파랑", "초록", "분홍", "주황", "노랑", "검정", "흰색", "보라", "갈색", "청록", "라임", "적갈색", "장미", "바나나", "회색", "황갈색", "산호색" }
         };
 
 public static string SafeColorName(int id)

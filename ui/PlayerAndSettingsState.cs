@@ -104,7 +104,9 @@ public static string spoofFriendCodeInput = "----";
 
 public static string localFriendCodeInput = "yourlocal#fc";
 
-public static string ghostChatColorHex = "#D7B8FF";
+private const string GhostChatDefaultColor = "#AFAFAF";
+
+public static string ghostChatColorHex = GhostChatDefaultColor;
 
 public static bool isEditingLevel = false;
 
@@ -278,6 +280,8 @@ public static string botBanListPath = "";
 public static bool banBotsEnabled = false;
 
 public static bool oldAntiCheatVersion = false;
+
+public static bool overflowProtection = true;
 
 public static readonly string[] botNameTokens = new string[]
         {
@@ -519,12 +523,40 @@ public static void SendNotification(string title, string message, float ttl = 3.
             if (!EnableCustomNotifs) return;
             title = NormalizeNotificationText(title);
             message = NormalizeNotificationText(message);
+            if (ShouldSuppressBanNotification(title, message)) return;
             lock (notificationQueueLock)
             {
                 if (pendingScreenNotifications.Count >= 64)
                     pendingScreenNotifications.Dequeue();
                 pendingScreenNotifications.Enqueue(new ElysiumNotification(title, message, ttl));
             }
+        }
+
+private static bool ShouldSuppressBanNotification(string title, string message)
+        {
+            if (!IsBanNotification(title, message)) return false;
+
+            float now = Time.unscaledTime;
+            if (now < nextBanNotificationAllowedAt)
+            {
+                return true;
+            }
+
+            nextBanNotificationAllowedAt = now + BanNotificationCooldownSeconds;
+            return false;
+        }
+
+private static bool IsBanNotification(string title, string message)
+        {
+            return ContainsBanToken(title) || ContainsBanToken(message);
+        }
+
+private static bool ContainsBanToken(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            return text.IndexOf("ban", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   text.IndexOf("banned", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   text.IndexOf("бан", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
 private static string NormalizeNotificationText(string text)
@@ -698,6 +730,18 @@ public static Dictionary<byte, RoleTypes> forcedPreGameRoles = new Dictionary<by
 
 public static bool enablePreGameRoleForce = false;
 
+public static bool autoTwoImpostors = false;
+
+private static readonly HashSet<byte> autoTwoImpostorPlayerIds = new HashSet<byte>();
+
+private static bool autoTwoImpostorsNeedsGameStartRoll = true;
+
+private static bool autoTwoImpostorsWasGameStarted = false;
+
+private static int autoTwoImpostorsLastLobbyFingerprint = 0;
+
+private static float nextAutoTwoImpostorsLobbyCheckAt = 0f;
+
 private Vector2 preRolesListScrollPos = Vector2.zero;
 
 private Vector2 preRolesActionScrollPos = Vector2.zero;
@@ -729,6 +773,10 @@ private static readonly Queue<ElysiumNotification> pendingScreenNotifications = 
 private static readonly object notificationQueueLock = new object();
 
 private static float nextNotificationDisplayAt;
+
+private const float BanNotificationCooldownSeconds = 2.5f;
+
+private static float nextBanNotificationAllowedAt;
 
 private bool stylesInited = false;
 

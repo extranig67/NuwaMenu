@@ -133,7 +133,7 @@ public void OnGUI()
                     else if (isEditingLevel && HandleClipboardShortcut(e, ref spoofLevelString)) { }
                     else if (isEditingFriendCode && HandleClipboardShortcut(e, ref spoofFriendCodeInput)) { }
                     else if (isEditingLocalFriendCode && HandleClipboardShortcut(e, ref localFriendCodeInput)) { }
-                    else if (isEditingGhostChatColor && HandleClipboardShortcut(e, ref ghostChatColorHex, 7)) { ghostChatColorHex = FilterHexInput(ghostChatColorHex, 7); }
+                    else if (isEditingGhostChatColor && HandleClipboardShortcut(e, ref ghostChatColorHex, 10)) { ghostChatColorHex = FilterGhostChatColorInput(ghostChatColorHex); }
                     else if (e.keyCode == KeyCode.Backspace)
                     {
                         if (isEditingBan && banInput.Length > 0) { banInput = banInput.Substring(0, banInput.Length - 1); }
@@ -151,7 +151,7 @@ public void OnGUI()
                         if (isEditingLevel) { spoofLevelString += e.character; }
                         if (isEditingFriendCode) { spoofFriendCodeInput += e.character; }
                         if (isEditingLocalFriendCode) { localFriendCodeInput += e.character; }
-                        if (isEditingGhostChatColor) { ghostChatColorHex = FilterHexInput((ghostChatColorHex ?? "") + e.character, 7); }
+                        if (isEditingGhostChatColor) { ghostChatColorHex = FilterGhostChatColorInput((ghostChatColorHex ?? "") + e.character); }
                         e.Use();
                     }
                 }
@@ -205,7 +205,10 @@ public void OnGUI()
                             if (!lastPlayerClientIds.Contains(id) && !pendingJoinTimers.ContainsKey(id))
                             {
                                 if (!isInitialPresenceSnapshot && !IsLocalClientId(id))
+                                {
                                     pendingJoinTimers[id] = 1.5f;
+                                    pendingJoinWaitTimes[id] = 0f;
+                                }
                             }
                         }
 
@@ -213,30 +216,55 @@ public void OnGUI()
                         foreach (var id in keysToProcess)
                         {
                             pendingJoinTimers[id] -= historyDelta;
+                            pendingJoinWaitTimes[id] = pendingJoinWaitTimes.TryGetValue(id, out float waited) ? waited + historyDelta : historyDelta;
                             if (pendingJoinTimers[id] <= 0f)
                             {
-                                pendingJoinTimers.Remove(id);
-
                                 var pc = PlayerControl.AllPlayerControls.ToArray().FirstOrDefault(p => p != null && p.Data != null && p.Data.ClientId == id);
-                                if (pc != null && pc.Data != null && !pc.Data.Disconnected)
+                                if (pc == null || pc.Data == null || pc.Data.Disconnected)
                                 {
-                                    if (pc == PlayerControl.LocalPlayer || pc.AmOwner) continue;
-                                    SafePlayerIdentitySnapshot identity;
-                                    bool hasIdentity = TryGetSafeIdentity(pc, out identity);
-                                    string safeName = hasIdentity ? identity.Name : $"Player {pc.PlayerId}";
-                                    if (DetailedJoinInfo)
+                                    if (pendingJoinWaitTimes[id] < JoinLevelMaxWaitSeconds)
                                     {
-                                        int level = hasIdentity ? identity.Level : 1;
-                                        string platform = hasIdentity ? identity.Platform : "Unknown";
-                                        string fc = hasIdentity ? identity.FriendCode : "Hidden";
+                                        pendingJoinTimers[id] = 0.5f;
+                                        continue;
+                                    }
 
-                                        ShowNotification($"<color=#00FF00>[+]</color> {safeName} joined\n<color=#aaaaaa>Lvl: {level} | {platform} | FC: {fc}</color>");
-                                    }
-                                    else
-                                    {
-                                        ShowNotification($"<color=#00FF00>[+]</color> {safeName} joined");
-                                    }
+                                    pendingJoinTimers.Remove(id);
+                                    pendingJoinWaitTimes.Remove(id);
+                                    continue;
                                 }
+
+                                if (pc == PlayerControl.LocalPlayer || pc.AmOwner)
+                                {
+                                    pendingJoinTimers.Remove(id);
+                                    pendingJoinWaitTimes.Remove(id);
+                                    continue;
+                                }
+
+                                SafePlayerIdentitySnapshot identity;
+                                bool hasIdentity = TryGetSafeIdentity(pc, out identity);
+                                bool hasLevel = TryGetPlayerDisplayLevel(pc, hasIdentity ? identity : null, out int level);
+                                if (DetailedJoinInfo && !hasLevel && pendingJoinWaitTimes[id] < JoinLevelMaxWaitSeconds)
+                                {
+                                    pendingJoinTimers[id] = 0.5f;
+                                    continue;
+                                }
+
+                                string safeName = hasIdentity ? identity.Name : $"Player {pc.PlayerId}";
+                                if (DetailedJoinInfo)
+                                {
+                                    string levelText = hasLevel ? level.ToString() : "?";
+                                    string platform = hasIdentity ? identity.Platform : "Unknown";
+                                    string fc = hasIdentity ? identity.FriendCode : "Hidden";
+
+                                    ShowNotification($"<color=#00FF00>[+]</color> {safeName} joined\n<color=#aaaaaa>Lvl: {levelText} | {platform} | FC: {fc}</color>");
+                                }
+                                else
+                                {
+                                    ShowNotification($"<color=#00FF00>[+]</color> {safeName} joined");
+                                }
+
+                                pendingJoinTimers.Remove(id);
+                                pendingJoinWaitTimes.Remove(id);
                             }
                         }
 
@@ -245,6 +273,7 @@ public void OnGUI()
                             if (!currentClientIds.Contains(id))
                             {
                                 pendingJoinTimers.Remove(id);
+                                pendingJoinWaitTimes.Remove(id);
                                 MarkPlayerHistoryLeftByClientId(id);
                             }
                         }
@@ -258,6 +287,7 @@ public void OnGUI()
                             MarkPlayerHistoryLeftByClientId(id);
                         lastPlayerClientIds.Clear();
                         pendingJoinTimers.Clear();
+                        pendingJoinWaitTimes.Clear();
                     }
                 }
                 catch { }

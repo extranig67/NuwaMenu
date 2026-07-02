@@ -356,6 +356,16 @@ public static bool tpToCursor = false;
 
 public static bool dragToCursor = false;
 
+private const float CursorMoveRpcIntervalSeconds = 0.2f;
+
+private const float CursorMoveRpcMinDistance = 0.35f;
+
+private static float nextCursorMoveRpcAt = 0f;
+
+private static Vector2 lastCursorMoveRpcPosition = Vector2.zero;
+
+private static bool hasLastCursorMoveRpcPosition = false;
+
 public static float walkSpeed = 1f;
 
 public static bool DetailedJoinInfo = true;
@@ -363,6 +373,10 @@ public static bool DetailedJoinInfo = true;
 private static List<int> lastPlayerClientIds = new List<int>();
 
 private static Dictionary<int, float> pendingJoinTimers = new Dictionary<int, float>();
+
+private static Dictionary<int, float> pendingJoinWaitTimes = new Dictionary<int, float>();
+
+private const float JoinLevelMaxWaitSeconds = 5f;
 
 private static float nextPlayerHistoryUpdateAt;
 
@@ -381,7 +395,7 @@ private sealed class SafePlayerIdentitySnapshot
             public string Puid = "Unknown";
             public string Platform = "Unknown";
             public string CustomPlatform = "";
-            public int Level = 1;
+            public int Level = 0;
         }
 
 private static readonly Dictionary<int, SafePlayerIdentitySnapshot> safeIdentityByClientId = new Dictionary<int, SafePlayerIdentitySnapshot>();
@@ -408,6 +422,23 @@ public class PlayerHistoryEntry
         }
 
 private static List<PlayerHistoryEntry> playerHistoryEntries = new List<PlayerHistoryEntry>();
+
+private sealed class PlayerHistoryViewRow
+        {
+            public string Header;
+            public string Identity;
+            public string Times;
+            public string Platform;
+            public string Rpc;
+        }
+
+private static readonly Dictionary<string, PlayerHistoryEntry> playerHistoryEntryLookup = new Dictionary<string, PlayerHistoryEntry>();
+
+private static readonly List<PlayerHistoryViewRow> playerHistoryViewRows = new List<PlayerHistoryViewRow>();
+
+private static bool playerHistoryViewDirty = true;
+
+private const float PlayerHistoryRowHeight = 92f;
 
 private static bool playerHistoryLoaded = false;
 

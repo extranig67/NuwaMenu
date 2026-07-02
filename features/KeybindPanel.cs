@@ -69,15 +69,111 @@ private static string FilterHexInput(string input, int maxChars)
             return clean.Length == 0 ? "#" : clean;
         }
 
+private static string FilterGhostChatColorInput(string input)
+        {
+            string value = (input ?? string.Empty).Trim();
+            if (IsGhostChatKeyword(value))
+                return NormalizeGhostChatKeyword(value);
+
+            if (value.StartsWith("#") || value.All(c => (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')))
+                return FilterHexInput(value, 7);
+
+            string clean = "";
+            foreach (char c in value)
+            {
+                if (char.IsLetter(c))
+                {
+                    clean += char.ToLowerInvariant(c);
+                    if (clean.Length >= 10) break;
+                }
+            }
+
+            return clean;
+        }
+
+private static bool IsGhostChatKeyword(string input)
+        {
+            string value = NormalizeGhostChatKeyword(input);
+            return value == "rainbow" || value == "shimmer";
+        }
+
+private static string NormalizeGhostChatKeyword(string input)
+        {
+            string value = (input ?? string.Empty).Trim().ToLowerInvariant();
+            switch (value)
+            {
+                case "rainbow":
+                case "радуга":
+                case "раинбов":
+                case "lgbt":
+                    return "rainbow";
+                case "shimmer":
+                case "шимер":
+                case "шиммер":
+                    return "shimmer";
+                default:
+                    return value;
+            }
+        }
+
+private static string SanitizeGhostChatColorSetting(string input)
+        {
+            string value = (input ?? string.Empty).Trim();
+            if (IsGhostChatKeyword(value))
+                return NormalizeGhostChatKeyword(value);
+
+            string hex = SanitizeHexColor(value, GhostChatDefaultColor);
+            return string.Equals(hex, "#D7B8FF", StringComparison.OrdinalIgnoreCase) ? GhostChatDefaultColor : hex;
+        }
+
 public static string GetGhostChatColorHex()
         {
             if (isEditingGhostChatColor)
             {
-                return SanitizeHexColor(ghostChatColorHex, "#D7B8FF");
+                return SanitizeHexColor(ghostChatColorHex, GhostChatDefaultColor);
             }
 
-            ghostChatColorHex = SanitizeHexColor(ghostChatColorHex, "#D7B8FF");
+            ghostChatColorHex = SanitizeGhostChatColorSetting(ghostChatColorHex);
+            if (IsGhostChatKeyword(ghostChatColorHex))
+                return GhostChatDefaultColor;
             return ghostChatColorHex;
+        }
+
+public static string RenderGhostChatMessageText(string chatText)
+        {
+            string mode = NormalizeGhostChatKeyword(ghostChatColorHex);
+            if (mode == "rainbow")
+                return ApplyGhostChatRainbow(chatText);
+            if (mode == "shimmer")
+                return ApplyMenuShimmer(chatText);
+
+            string hex = GetGhostChatColorHex();
+            return $"<color={hex}>{chatText}</color>";
+        }
+
+private static string ApplyGhostChatRainbow(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+
+            string result = "";
+            int visibleIndex = 0;
+            float baseHue = Mathf.Repeat(Time.unscaledTime * 0.18f, 1f);
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (char.IsWhiteSpace(c))
+                {
+                    result += c;
+                    continue;
+                }
+
+                float hue = Mathf.Repeat(baseHue + visibleIndex * 0.085f, 1f);
+                Color color = Color.HSVToRGB(hue, 0.9f, 1f);
+                result += $"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{c}</color>";
+                visibleIndex++;
+            }
+
+            return result;
         }
 
 private static string BuildLocalNameRenderText(string input)
@@ -255,9 +351,10 @@ private void TryAutoBanBrokenFriendCodeTick()
                     string name = hasIdentity ? identity.Name : $"Player {pc.PlayerId}";
                     string puid = hasIdentity ? identity.Puid : "Unknown";
 
-                    AddToBanList(string.IsNullOrWhiteSpace(fc) ? "Unknown" : fc, puid, name, "Broken FriendCode");
+                    string reason = "Broken FriendCode";
+                    AddToBanList(string.IsNullOrWhiteSpace(fc) ? "Unknown" : fc, puid, name, reason);
+                    RegisterAntiCheatDisconnectNotice(owner, name, reason, true);
                     AmongUsClient.Instance.KickPlayer(owner, true);
-                    ShowNotification($"<color=#FF4444>[ANTICHEAT]</color> {name} banned: broken FC");
                 }
             }
             catch { }
@@ -480,8 +577,8 @@ private static void HostBanForPlatform(PlayerControl player, string reason)
                 string puid = hasIdentity ? identity.Puid : "Unknown";
 
                 AddToBanList(fc, puid, name, reason);
+                RegisterAntiCheatDisconnectNotice(owner, name, reason, true);
                 AmongUsClient.Instance.KickPlayer(owner, true);
-                ShowNotification($"<color=#FF4444>[PLATFORM BAN]</color> <b>{name}</b>: {reason}");
             }
             catch { }
         }

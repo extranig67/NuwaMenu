@@ -180,6 +180,8 @@ private static void ResetInboundEnvelope(SendOption sendOption)
 		activeInboundSpawnExploitDetail = null;
 		activeInboundHasDataFlood = false;
 		activeInboundDataFloodDetail = null;
+		activeInboundHasNetIdOverflow = false;
+		activeInboundNetIdOverflowDetail = null;
 		activeInboundPhantomFlood = false;
 		activeInboundHasPhantomNetId = false;
 	}
@@ -297,6 +299,8 @@ private static void CaptureGameDataEnvelope(MessageReader reader, byte tag, Send
 		activeInboundSpawnExploitDetail = null;
 		activeInboundHasDataFlood = false;
 		activeInboundDataFloodDetail = null;
+		activeInboundHasNetIdOverflow = false;
+		activeInboundNetIdOverflowDetail = null;
 		ScratchSpawnNetIds.Clear();
 		if (reader == null)
 		{
@@ -345,6 +349,13 @@ private static void CaptureGameDataEnvelope(MessageReader reader, byte tag, Send
 						{
 						dataCopy = MessageReader.Get(part);
 						uint dataNetId = dataCopy.ReadPackedUInt32();
+						if (dataNetId == 0)
+						{
+							activeInboundHasNetIdOverflow = true;
+							activeInboundNetIdOverflowDetail = "DATA used reserved netId 0.";
+							break;
+						}
+
 						InnerNetClient innerCheck = (InnerNetClient)AmongUsClient.Instance;
 						if (!innerCheck.allObjects.AllObjectsFast.ContainsKey(dataNetId) &&
 							!innerCheck.DestroyedObjects.Contains(dataNetId))
@@ -370,6 +381,7 @@ private static void CaptureGameDataEnvelope(MessageReader reader, byte tag, Send
 						finally { dataCopy?.Recycle(); }
 					}
 					catch { }
+					if (activeInboundHasNetIdOverflow) break;
 				}
 
 				if (partTag == 4 && SpawnShouldDrop(part))
@@ -443,6 +455,13 @@ private static void CaptureGameDataEnvelope(MessageReader reader, byte tag, Send
 
 				if (part.Tag == 2 && TryReadRpcEnvelope(part, out uint netId, out byte callId))
 				{
+					if (netId == 0)
+					{
+						activeInboundHasNetIdOverflow = true;
+						activeInboundNetIdOverflowDetail = $"RPC #{callId} used reserved netId 0.";
+						break;
+					}
+
 					if (rpcContexts == null)
 					{
 						rpcContexts = new List<RpcEnvelopeContext>();
@@ -700,6 +719,34 @@ private static bool TryTakeRpcEnvelopeContext(InnerNetObject netObject, byte cal
 		}
 
 		return false;
+	}
+
+internal static int ResolveCurrentRpcSenderClientId(InnerNetObject netObject, byte callId)
+	{
+		int senderClientId = GetActiveInboundSenderClientId();
+		try
+		{
+			CleanupRpcEnvelopeContexts();
+			if (netObject == null || PendingRpcContexts.Count == 0)
+			{
+				return ResolveRpcSenderClientId(senderClientId, false, default);
+			}
+
+			uint netId = netObject.NetId;
+			for (int i = 0; i < PendingRpcContexts.Count; i++)
+			{
+				RpcEnvelopeContext candidate = PendingRpcContexts[i];
+				if (candidate.NetId == netId && candidate.CallId == callId)
+				{
+					return ResolveRpcSenderClientId(senderClientId, true, candidate);
+				}
+			}
+		}
+		catch
+		{
+		}
+
+		return ResolveRpcSenderClientId(senderClientId, false, default);
 	}
 
 private static int ResolveRpcSenderClientId(int currentClientId, bool hasRpcContext, RpcEnvelopeContext rpcContext)
@@ -995,6 +1042,12 @@ internal static bool CheckVoteKickRpc(VoteBanSystem system, int callId, MessageR
 			copy = MessageReader.Get(reader);
 			copy.ReadInt32();
 			int target = copy.ReadInt32();
+
+			if (ElysiumModMenu.ElysiumModMenuGUI.banVoteKickVoters)
+			{
+				ElysiumModMenu.ElysiumModMenuGUI.VoteBanSystemPatch.BanVoteKickVoter(voterClientId, ClientName(voterClientId), ClientName(target));
+				return HarmonyControl.SkipOriginal;
+			}
 
 			InnerNetClient inner = (InnerNetClient)AmongUsClient.Instance;
 			if (target == inner.ClientId || target == inner.HostId)

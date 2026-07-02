@@ -42,6 +42,119 @@ namespace ElysiumModMenu
 {
     public partial class ElysiumModMenuGUI : MonoBehaviour
     {
+private struct AntiCheatDisconnectNotice
+        {
+            public string PlayerName;
+            public string Reason;
+            public bool Ban;
+            public float RegisteredAt;
+        }
+
+private static readonly Dictionary<int, AntiCheatDisconnectNotice> pendingAntiCheatDisconnectNotices = new Dictionary<int, AntiCheatDisconnectNotice>();
+
+public static void RegisterAntiCheatDisconnectNotice(int clientId, string playerName, string reason, bool ban)
+        {
+            try
+            {
+                PruneAntiCheatDisconnectNotices();
+
+                string cleanName = string.IsNullOrWhiteSpace(playerName) ? $"Client {clientId}" : playerName;
+                string cleanReason = string.IsNullOrWhiteSpace(reason) ? "Unknown" : reason;
+
+                pendingAntiCheatDisconnectNotices[clientId] = new AntiCheatDisconnectNotice
+                {
+                    PlayerName = cleanName,
+                    Reason = cleanReason,
+                    Ban = ban,
+                    RegisteredAt = Time.realtimeSinceStartup
+                };
+
+                ShowNotification(BuildAntiCheatDisconnectNotification(cleanName, cleanReason, ban));
+            }
+            catch { }
+        }
+
+private static void PruneAntiCheatDisconnectNotices()
+        {
+            try
+            {
+                if (pendingAntiCheatDisconnectNotices.Count == 0) return;
+
+                float now = Time.realtimeSinceStartup;
+                List<int> stale = null;
+                foreach (var pair in pendingAntiCheatDisconnectNotices)
+                {
+                    if (now - pair.Value.RegisteredAt > 20f)
+                    {
+                        if (stale == null) stale = new List<int>();
+                        stale.Add(pair.Key);
+                    }
+                }
+
+                if (stale == null) return;
+                for (int i = 0; i < stale.Count; i++)
+                    pendingAntiCheatDisconnectNotices.Remove(stale[i]);
+            }
+            catch { }
+        }
+
+private static bool TryConsumeAntiCheatDisconnectNotice(PlayerControl player, out string message)
+        {
+            message = null;
+            try
+            {
+                if (player == null) return false;
+
+                int clientId = (int)player.OwnerId;
+                if (!pendingAntiCheatDisconnectNotices.TryGetValue(clientId, out AntiCheatDisconnectNotice notice))
+                    return false;
+
+                pendingAntiCheatDisconnectNotices.Remove(clientId);
+                message = BuildAntiCheatDisconnectGameMessage(notice.PlayerName, notice.Reason, notice.Ban);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+private static string BuildAntiCheatDisconnectNotification(string playerName, string reason, bool ban)
+        {
+            string action = ban ? "Banned" : "Kicked";
+            return $"<color=#FF4444>[ANTICHEAT]</color> <b>{playerName}</b>\n{action} from Anti cheat Among Us\nReason: {reason}";
+        }
+
+private static string BuildAntiCheatDisconnectGameMessage(string playerName, string reason, bool ban)
+        {
+            string action = ban ? "Banned" : "Kicked";
+            return $"<color=#FF4444>{action} from Anti cheat Among Us</color>\n<b>{playerName}</b>\nReason: {reason}";
+        }
+
+[HarmonyPatch(typeof(HudManager), nameof(HudManager.NotifyOfDisconnect))]
+        public static class HudManager_NotifyOfDisconnect_AntiCheatNotice_Patch
+        {
+            public static bool Prefix(HudManager __instance, PlayerControl pc)
+            {
+                try
+                {
+                    if (!TryConsumeAntiCheatDisconnectNotice(pc, out string message))
+                        return true;
+
+                    if (__instance != null && __instance.Notifier != null)
+                    {
+                        __instance.Notifier.AddDisconnectMessage(message);
+                    }
+
+                    return false;
+                }
+                catch
+                {
+                    return true;
+                }
+            }
+        }
+
 public static class ElysiumAnticheat
         {
             public static void Flag(PlayerControl player, string reason)
@@ -52,7 +165,7 @@ public static class ElysiumAnticheat
 
                 int mode = ElysiumModMenuGUI.punishmentMode;
 
-                if (mode >= 1)
+                if (mode == 1)
                 {
                     ElysiumModMenuGUI.ShowNotification($"<color=#FF0000>[ANTICHEAT]</color> <b>{pName}</b>: {reason}");
                 }
@@ -61,6 +174,7 @@ public static class ElysiumAnticheat
                 {
                     if (mode == 2)
                     {
+                        ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(player.OwnerId, pName, reason, false);
                         AmongUsClient.Instance.KickPlayer(player.OwnerId, false);
                     }
                     else if (mode == 3)
@@ -76,6 +190,7 @@ public static class ElysiumAnticheat
 
                         ElysiumModMenuGUI.AddToBanList(fc, puid, pName, $"Anticheat: {reason}");
 
+                        ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(player.OwnerId, pName, reason, true);
                         AmongUsClient.Instance.KickPlayer(player.OwnerId, true);
                     }
                 }
@@ -208,8 +323,8 @@ public static class ElysiumAnticheat
                                         catch { }
                                         ElysiumModMenuGUI.AddToBanList(qcFc, qcPuid, qcName, "QuickChat Empty spam (anti-crash)");
                                     }
+                                    ElysiumModMenuGUI.RegisterAntiCheatDisconnectNotice(__instance.OwnerId, qcName, "QuickChat spam", qcBan);
                                     AmongUsClient.Instance.KickPlayer(__instance.OwnerId, qcBan);
-                                    ElysiumModMenuGUI.ShowNotification($"<color=#FF4444>[ANTI-CRASH]</color> {qcName} {(qcBan ? "banned" : "kicked")}: QuickChat spam");
                                 }
                                 catch { }
                             }
