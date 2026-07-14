@@ -1,18 +1,18 @@
 <div align="center">
 
-# Elysium Mod Menu
+# NuwaMenu
 
 **A configurable BepInEx IL2CPP menu for Among Us**
 
 <br>
 
-<a href="https://github.com/Wextikit/ElysiumModMenu/releases/latest">
+<a href="https://github.com/Wextikit/NuwaMenu/releases/latest">
   <img src="https://img.shields.io/badge/Download-Latest%20Release-2ea44f?style=for-the-badge&logo=github&logoColor=white" alt="Download">
 </a>
 <a href="docs/CHANGELOG.md">
   <img src="https://img.shields.io/badge/Changelog-View-0969da?style=for-the-badge" alt="Changelog">
 </a>
-<a href="https://github.com/Wextikit/ElysiumModMenu/issues">
+<a href="https://github.com/Wextikit/NuwaMenu/issues">
   <img src="https://img.shields.io/badge/Report-Issue-da3633?style=for-the-badge&logo=github&logoColor=white" alt="Report an issue">
 </a>
 
@@ -20,13 +20,13 @@
 <br>
 
 <a href="https://discord.gg/CdrpKJzFp">
-  <img src="https://img.shields.io/badge/Discord-ElysiumModMenu-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord">
+  <img src="https://img.shields.io/badge/Discord-NuwaMenu-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord">
 </a>
 
 </div>
 
 > [!CAUTION]
-> This menu includes host, network, spoofing, and moderation tools. Use it only in private or consenting lobbies. Misuse can disrupt games and may result in account or server moderation. Elysium Mod Menu is not affiliated with Innersloth.
+> This menu includes host, network, spoofing, and moderation tools. Use it only in private or consenting lobbies. Misuse can disrupt games and may result in account or server moderation. NuwaMenu is not affiliated with Innersloth.
 
 ## Features
 
@@ -45,11 +45,11 @@
 ## Installation and usage
 
 > [!WARNING]
-> Before installing Elysium Mod Menu, make sure you understand the disclaimer and use the menu only in private, testing, or consenting lobbies.
+> Before installing NuwaMenu, make sure you understand the disclaimer and use the menu only in private, testing, or consenting lobbies.
 
 ###  1. Install BepInEx IL2CPP
  
- ♯ Elysium Mod Menu is a **BepInEx IL2CPP** mod.
+ ♯ NuwaMenu is a **BepInEx IL2CPP** mod.
 Among Us is a Unity IL2CPP game, so the normal Mono version of BepInEx will not work.
 
  ♯ Download BepInEx IL2CPP from one of these sources:
@@ -97,14 +97,14 @@ If you do not see `winhttp.dll`, `dotnet`, and `BepInEx` next to `Among Us.exe`,
 Launch Among Us once after installing BepInEx.
 The first launch may take longer than usual and a console window may appear. This is normal. Once the game reaches the main menu, close it.
 
-### 3. Install Elysium Mod Menu
+### 3. Install NuwaMenu
 
-Download `ElysiumModMenu.dll` from the [latest Elysium release](https://github.com/Wextikit/ElysiumModMenu/releases/latest).
+Download `NuwaMenu.dll` from the [latest NuwaMenu release](https://github.com/Wextikit/NuwaMenu/releases/latest).
 
 Place the file here:
 
 ```
-Among Us/BepInEx/plugins/ElysiumModMenu.dll
+Among Us/BepInEx/plugins/NuwaMenu.dll
 ```
 
 If the `plugins` folder does not exist, create it manually inside the `BepInEx` folder.
@@ -113,18 +113,18 @@ If the `plugins` folder does not exist, create it manually inside the `BepInEx` 
 
  ♡ Start Among Us.
 
-Press **Insert** to open Elysium Mod Menu.
+Press **Insert** to open NuwaMenu.
 On some keyboards, you may need to press **Fn + Insert** or enable/disable **Num Lock**.
 
 The menu key can be changed later in the menu settings.
 
-### Updating ☾ Elysium Mod Menu
+### Updating ☾ NuwaMenu
 
 To update the menu:
 
 1. ♯ Close Among Us.
 
-2. ♯ Download the new `ElysiumModMenu.dll` from the [latest release](https://github.com/Wextikit/ElysiumModMenu/releases/latest).
+2. ♯ Download the new `NuwaMenu.dll` from the [latest release](https://github.com/Wextikit/NuwaMenu/releases/latest).
 
 3. ♯ Replace the old file in:
 
@@ -152,8 +152,8 @@ The Platform Spoof option can display supported platform labels to other clients
 
 ##  ♡ Community and support
 
-* Join the [ElysiumModMenu Discord](https://discord.gg/CdrpKJzFp) for announcements, help, previews, and community discussion.
-* Use [GitHub Issues](https://github.com/Wextikit/ElysiumModMenu/issues) for reproducible bugs and feature requests.
+* Join the [NuwaMenu Discord](https://discord.gg/CdrpKJzFp) for announcements, help, previews, and community discussion.
+* Use [GitHub Issues](https://github.com/Wextikit/NuwaMenu/issues) for reproducible bugs and feature requests.
 * When reporting a problem, include the menu version, game platform, what happened, reproduction steps, and the relevant log excerpt.
 * Remove room codes, Friend Codes, PUIDs, chat messages, and personal paths before posting logs publicly.
 
@@ -163,11 +163,11 @@ The Platform Spoof option can display supported platform labels to other clients
 ## ♯ Useful files
 
 ```
-Among Us/ElysiumModMenu/ElysiumModMenu.cfg
-Among Us/ElysiumModMenu/ElysiumModMenuBanList.txt
-Among Us/ElysiumModMenu/ElysiumBotBanList.txt
-Among Us/ElysiumModMenu/ElysiumPlatformBanList.txt
-Among Us/ElysiumModMenu/ElysiumFriendEspIgnore.txt
+Among Us/NuwaMenu/NuwaMenu.cfg
+Among Us/NuwaMenu/NuwaMenuBanList.txt
+Among Us/NuwaMenu/NuwaMenuBotBanList.txt
+Among Us/NuwaMenu/NuwaMenuPlatformBanList.txt
+Among Us/NuwaMenu/NuwaMenuFriendEspIgnore.txt
 ```
 
 <details>
@@ -176,7 +176,7 @@ Among Us/ElysiumModMenu/ElysiumFriendEspIgnore.txt
 The project targets .NET 6 and requires local Among Us/BepInEx interop assemblies.
 
 ```
-dotnet build .\ElysiumModMenu.slnx -c Release
+dotnet build .\NuwaMenu.slnx -c Release
 ```
 
 </details>
@@ -229,7 +229,7 @@ These options are located in the **Menu** tab. Unlock behavior is client-side, m
 ## Disclaimer 
 
 > [!IMPORTANT]
-> Elysium Mod Menu is an independent, unofficial modification. It is not affiliated with, endorsed by, sponsored by, or approved by Innersloth LLC. Among Us, its name, trademarks, and game assets belong to their respective owners.
+> NuwaMenu is an independent, unofficial modification. It is not affiliated with, endorsed by, sponsored by, or approved by Innersloth LLC. Among Us, its name, trademarks, and game assets belong to their respective owners.
 
 The software is provided **as-is**, without warranties of functionality, compatibility, availability, security, or fitness for a particular purpose. Game updates may break features or cause crashes.
 
